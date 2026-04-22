@@ -1,0 +1,111 @@
+<div class="page">
+  <header class="page-head">
+    <h1>PR Management</h1>
+    <p class="muted">
+      Grouped by domain and page with separate sections for GitHub Issues and Pull Requests.
+    </p>
+  </header>
+
+  @if (message) {
+    <div class="banner ok">{{ message }}</div>
+  }
+  @if (error) {
+    <div class="banner error">{{ error }}</div>
+  }
+
+  <section class="panel section-panel">
+    <h2>GitHub Issues Section</h2>
+    <p class="muted section-help">Use this section when you only want to create or review GitHub issues.</p>
+    @for (d of issueSectionGroups; track d.domain) {
+      <h3>Domain: {{ d.domain }}</h3>
+      @for (p of d.pages; track p.pageUrl) {
+        <section class="table-wrap">
+          <h4>{{ p.pageUrl }}</h4>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Issue</th>
+                <th>SEO score</th>
+                <th>Suggested code snippet</th>
+                <th>Issue actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (i of p.issues; track i.id) {
+                <tr>
+                  <td>{{ i.message }}</td>
+                  <td>{{ i.seo_score != null ? i.seo_score : '—' }}</td>
+                  <td class="suggestion"><pre>{{ i.code_snippet || i.ai_suggestion || '—' }}</pre></td>
+                  <td>
+                    <button type="button" (click)="copyCode(i.code_snippet || i.ai_suggestion)" [disabled]="busyId === i.id">
+                      Copy code
+                    </button>
+                    @if (i.github_issue_url) {
+                      <a [href]="i.github_issue_url" target="_blank" rel="noopener">View Issue</a>
+                    } @else {
+                      <button type="button" (click)="createGithub(i)" [disabled]="busyId === i.id">
+                        {{ busyId === i.id ? '…' : 'Create Issue' }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+    } @empty {
+      <p class="muted">No issues yet. Run a scan first.</p>
+    }
+  </section>
+
+  <section class="panel section-panel">
+    <h2>GitHub Pull Requests Section</h2>
+    <p class="muted section-help">
+      Use this section to apply AI SEO fixes directly into repository files through pull requests.
+    </p>
+    @for (d of prSectionGroups; track d.domain) {
+      <h3>Domain: {{ d.domain }}</h3>
+      @for (p of d.pages; track p.pageUrl) {
+        <section class="table-wrap">
+          <h4>{{ p.pageUrl }}</h4>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Issue</th>
+                <th>SEO score</th>
+                <th>Suggested code snippet</th>
+                <th>Diff format</th>
+                <th>PR actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (i of p.issues; track i.id) {
+                <tr>
+                  <td>{{ i.message }}</td>
+                  <td>{{ i.seo_score != null ? i.seo_score : '—' }}</td>
+                  <td class="suggestion"><pre>{{ i.code_snippet || i.ai_suggestion || '—' }}</pre></td>
+                  <td class="suggestion"><pre>{{ i.code_diff || '—' }}</pre></td>
+                  <td>
+                    <button type="button" (click)="copyCode(i.code_snippet || i.ai_suggestion)" [disabled]="busyId === i.id">
+                      Copy code
+                    </button>
+                    @if (i.github_pr_url) {
+                      <a [href]="i.github_pr_url" target="_blank" rel="noopener">View PR</a>
+                    } @else {
+                      <button type="button" (click)="createPullRequest(i)" [disabled]="busyId === i.id">
+                        {{ busyId === i.id ? '…' : 'Create Pull Request' }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+    } @empty {
+      <p class="muted">No issues yet. Run a scan first.</p>
+    }
+  </section>
+</div>

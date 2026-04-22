@@ -1,0 +1,137 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
+.banner.ok {
+  background: rgba(94, 234, 212, 0.12);
+  border: 1px solid rgba(94, 234, 212, 0.35);
+}
+
+.banner.error {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.filter-panel {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter-panel label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.filter-panel select {
+  width: min(420px, 100%);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.65rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 500;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.suggestion {
+  max-width: 320px;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+h2,
+h3 {
+  margin: 0.75rem 1rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+button {
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: none;
+  background: rgba(94, 234, 212, 0.2);
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-right: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 0.65rem 1rem 0.85rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.page-numbers {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.page-numbers button.active {
+  background: rgba(94, 234, 212, 0.4);
+}
+
+.pagination .muted {
+  min-width: 110px;
+  text-align: center;
+}

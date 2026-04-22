@@ -1,0 +1,63 @@
+<div class="page">
+  <header class="page-head">
+    <h1>Domains</h1>
+    <p class="muted">Register domains for the daily scheduler and run on-demand scans.</p>
+  </header>
+
+  @if (message) {
+    <div class="banner ok">{{ message }}</div>
+  }
+  @if (error) {
+    <div class="banner error">{{ error }}</div>
+  }
+
+  <section class="panel">
+    <h2>Add domain</h2>
+    <div class="row">
+      <input type="text" [(ngModel)]="newDomain" placeholder="example.com" />
+      <button type="button" (click)="add()" [disabled]="!newDomain.trim()">Add</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Scan domain</h2>
+    <p class="muted small">POST /api/scan — optional email report and GitHub issue creation.</p>
+    <div class="stack">
+      <label>Domain</label>
+      <input type="text" [(ngModel)]="scanDomain" placeholder="example.com" />
+      <label>Email report to (optional)</label>
+      <input type="email" [(ngModel)]="emailTo" placeholder="you@company.com" />
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="createGithub" />
+        Create GitHub issues for each detected issue
+      </label>
+      <button type="button" (click)="scan()" [disabled]="launching || !scanDomain.trim()">
+        {{ launching ? 'Starting…' : 'Scan domain' }}
+      </button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Registered domains</h2>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Added</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (d of domains; track d.id) {
+          <tr>
+            <td>{{ d.domain }}</td>
+            <td>{{ d.created_at | date : 'medium' }}</td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="2" class="muted">No domains yet.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+</div>

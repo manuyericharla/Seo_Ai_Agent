@@ -1,0 +1,203 @@
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.page-head h1 {
+  margin: 0 0 0.25rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
+.banner.ok {
+  background: rgba(94, 234, 212, 0.12);
+  border: 1px solid rgba(94, 234, 212, 0.35);
+}
+
+.banner.error {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.panel label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.hint code {
+  font-size: 0.75rem;
+  background: rgba(148, 163, 184, 0.12);
+  padding: 0.1rem 0.25rem;
+  border-radius: 4px;
+}
+
+input[type='email'] {
+  max-width: 360px;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+select {
+  max-width: 220px;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  margin-top: 0.25rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.55rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+  font-size: 0.75rem;
+}
+
+.quality {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.quality.good {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.quality.needs {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.quality.poor {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.quality.na {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.ok {
+  color: #5eead4;
+  font-size: 0.8rem;
+}
+
+.err {
+  color: #fca5a5;
+  font-size: 0.8rem;
+}
+
+button {
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: none;
+  background: rgba(94, 234, 212, 0.2);
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+.pdf-link {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.pdf-link:hover {
+  text-decoration: underline;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-top: 0.85rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.page-numbers {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.page-numbers button.active {
+  background: rgba(94, 234, 212, 0.4);
+}
+
+.pagination .muted {
+  min-width: 110px;
+  text-align: center;
+}

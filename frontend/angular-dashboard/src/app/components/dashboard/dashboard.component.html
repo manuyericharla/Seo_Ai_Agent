@@ -1,0 +1,129 @@
+<div class="page">
+  <header class="page-head">
+    <h1>Dashboard</h1>
+    <p class="muted">Overview of domains, scans, and automation status.</p>
+  </header>
+
+  @if (error) {
+    <div class="banner error">{{ error }}</div>
+  }
+
+  @if (stats; as s) {
+    <section class="cards">
+      <article class="card">
+        <span class="label">Total domains</span>
+        <span class="value">{{ s.totalDomains }}</span>
+      </article>
+      <article class="card">
+        <span class="label">Pages scanned</span>
+        <span class="value">{{ s.pagesScanned }}</span>
+      </article>
+      <article class="card">
+        <span class="label">Issues detected</span>
+        <span class="value">{{ s.issuesDetected }}</span>
+      </article>
+      <article class="card accent">
+        <span class="label">Avg SEO score</span>
+        <span class="value">{{ s.seoScoreAvg != null ? (s.seoScoreAvg | number : '1.0-1') : '—' }}</span>
+      </article>
+    </section>
+  }
+
+  <section class="grid-2">
+    <div class="panel">
+      <h2>SEO score trend</h2>
+      <p class="muted small">Historical average scores from completed scans.</p>
+      <div class="chart-wrap">
+        <canvas #trendCanvas height="220"></canvas>
+      </div>
+      @if (!trend.length) {
+        <p class="muted small">Run a scan to populate the chart.</p>
+      }
+    </div>
+    <div class="panel">
+      <h2>Recent activity</h2>
+      <ul class="activity">
+        @for (a of pagedActivity; track a.id) {
+          <li>
+            <span class="badge" [ngClass]="a.level">{{ a.level }}</span>
+            <span class="msg">{{ a.message }}</span>
+            <span class="time">{{ a.created_at | date : 'short' }}</span>
+          </li>
+        }
+        @empty {
+          <li class="muted">No log entries yet.</li>
+        }
+      </ul>
+      @if (activity.length > activityPageSize) {
+        <div class="pagination">
+          <button type="button" (click)="previousActivityPage()" [disabled]="activityPage === 1">Prev</button>
+          <div class="page-numbers">
+            @for (page of activityPageNumbers; track page) {
+              <button
+                type="button"
+                (click)="goToActivityPage(page)"
+                [class.active]="page === activityPage"
+                [attr.aria-current]="page === activityPage ? 'page' : null"
+              >
+                {{ page }}
+              </button>
+            }
+          </div>
+          <span class="pagination-meta">Page {{ activityPage }} of {{ activityPagesCount }}</span>
+          <button type="button" (click)="nextActivityPage()" [disabled]="activityPage === activityPagesCount">
+            Next
+          </button>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Saved scheduler list</h2>
+    <p class="muted small">Shows only schedules saved from Automatic Scheduler.</p>
+    <div class="schedule-table-wrap">
+      <table class="schedule-table">
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Frequency</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of scheduledScans; track row.domain) {
+            <tr>
+              <td>{{ row.domain }}</td>
+              <td>{{ row.frequency }}</td>
+              <td>{{ row.email }}</td>
+              <td>
+                <span class="state-pill" [class.off]="!row.active">{{ row.active ? 'Active' : 'Inactive' }}</span>
+              </td>
+              <td>
+                @if (row.active) {
+                  <button type="button" class="cta-danger" (click)="markInactive(row.domain)">Inactive</button>
+                } @else {
+                  <button type="button" class="cta-success" (click)="markActive(row.domain)">Reactive</button>
+                }
+              </td>
+            </tr>
+          }
+          @empty {
+            <tr>
+              <td colspan="5" class="muted">No scheduler entries saved yet.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="nav-hint">
+    Manage domains on <a routerLink="/domains">Domains</a>, review
+    <a routerLink="/issue-create">issue creation</a>, view <a routerLink="/scans">scan history</a>, and set up
+    <a routerLink="/automatic-scheduler">automatic scheduling</a> with Claude PR
+    generation.
+  </p>
+</div>

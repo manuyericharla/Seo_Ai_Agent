@@ -1,0 +1,73 @@
+<div class="page">
+  <header class="page-head">
+    <h1>Issue Create</h1>
+    <p class="muted">Create GitHub issues for SEO findings, grouped by domain and page.</p>
+  </header>
+
+  @if (message) {
+    <div class="banner ok">{{ message }}</div>
+  }
+  @if (error) {
+    <div class="banner error">{{ error }}</div>
+  }
+
+  <section class="panel filter-panel">
+    <label for="domainFilter">Domain filter</label>
+    <select id="domainFilter" [(ngModel)]="selectedDomain" (ngModelChange)="onDomainChange()">
+      @for (d of availableDomains; track d) {
+        <option [value]="d">{{ d }}</option>
+      }
+    </select>
+  </section>
+
+  <section class="panel">
+    @for (d of selectedDomainGroups; track d.domain) {
+      <h2>Domain: {{ d.domain }}</h2>
+      @for (p of pagedSelectedPages; track p.pageUrl) {
+        <section class="table-wrap">
+          <h3>{{ p.pageUrl }}</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Issue</th>
+                <th>SEO score</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (i of p.issues; track i.id) {
+                <tr>
+                  <td>{{ i.message }}</td>
+                  <td>{{ i.seo_score != null ? i.seo_score : '—' }}</td>
+                  <td>
+                    @if (i.github_issue_url) {
+                      <a [href]="i.github_issue_url" target="_blank" rel="noopener">View Issue</a>
+                    } @else {
+                      <button type="button" (click)="createGithub(i)" [disabled]="busyId === i.id">
+                        {{ busyId === i.id ? '…' : 'Create Issue' }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+      @if (selectedPages.length > pageSize) {
+        <div class="pagination">
+          <button type="button" (click)="previousPage()" [disabled]="currentPage === 1">Prev</button>
+          <div class="page-numbers">
+            @for (p of pageNumbers; track p) {
+              <button type="button" (click)="goToPage(p)" [class.active]="p === currentPage">{{ p }}</button>
+            }
+          </div>
+          <span class="muted">Page {{ currentPage }} of {{ totalPages }}</span>
+          <button type="button" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+        </div>
+      }
+    } @empty {
+      <p class="muted">No issues for this domain yet.</p>
+    }
+  </section>
+</div>

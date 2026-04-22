@@ -1,0 +1,128 @@
+<div class="page">
+  <header class="page-head">
+    <h1>Scan history</h1>
+    <p class="muted">Recent scans with pages, SEO score, email, and GitHub automation status.</p>
+  </header>
+
+  @if (message) {
+    <div class="banner ok">{{ message }}</div>
+  }
+  @if (error) {
+    <div class="banner error">{{ error }}</div>
+  }
+
+  <section class="panel">
+    <label>Default email for “Send report”</label>
+    <input type="email" [(ngModel)]="emailTo" placeholder="reports@company.com" />
+    <label>Status filter</label>
+    <select [(ngModel)]="statusFilter" (ngModelChange)="onStatusFilterChange()">
+      <option value="all">All</option>
+      <option value="running">Running</option>
+      <option value="completed">Completed</option>
+      <option value="stopped">Stopped</option>
+      <option value="failed">Failed</option>
+    </select>
+    <p class="hint">
+      Sending requires SMTP in <strong>Settings</strong> or <code>.env</code> (<code>EMAIL_HOST</code>,
+      <code>EMAIL_USER</code>, <code>EMAIL_PASS</code>, etc.).
+    </p>
+  </section>
+
+  <div class="table-wrap panel">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Started</th>
+          <th>Pages</th>
+          <th>SEO avg</th>
+          <th>Quality</th>
+          <th>Status</th>
+          <th>Email</th>
+          <th>GH issues</th>
+          <th>Claude PR</th>
+          <th>PDF</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of pagedScans; track s.id) {
+          <tr>
+            <td>{{ s.domain }}</td>
+            <td>{{ s.started_at | date : 'short' }}</td>
+            <td>{{ s.pages_count }}</td>
+            <td>{{ s.seo_score_avg != null ? (s.seo_score_avg | number : '1.0-1') : '—' }}</td>
+            <td>
+              <span class="quality" [ngClass]="scoreQualityClass(s.seo_score_avg)">
+                {{ scoreQuality(s.seo_score_avg) }}
+              </span>
+            </td>
+            <td><span class="pill">{{ s.status }}</span></td>
+            <td>
+              @if (s.email_sent) {
+                <span class="ok">Sent {{ s.email_sent_at | date : 'short' }}</span>
+              } @else if (s.email_error) {
+                <span class="err" [title]="s.email_error">Error</span>
+              } @else {
+                —
+              }
+            </td>
+            <td>{{ s.github_issues_created }}</td>
+            <td>
+              @if (s.claude_pr_url) {
+                <button type="button" (click)="togglePrLink(s)">
+                  {{ showPrByScanId[s.id] ? 'Hide' : 'Show' }}
+                </button>
+                @if (showPrByScanId[s.id]) {
+                  <a class="pdf-link" [href]="s.claude_pr_url" target="_blank" rel="noopener">Open</a>
+                  <button type="button" (click)="copyPrLink(s.claude_pr_url)">Copy</button>
+                }
+                <button type="button" (click)="emailPrLink(s)" [disabled]="emailPrBusyId === s.id">
+                  {{ emailPrBusyId === s.id ? '…' : 'Email link' }}
+                </button>
+              } @else {
+                <button type="button" (click)="createClaudePr(s)" [disabled]="claudePrBusyId === s.id">
+                  {{ claudePrBusyId === s.id ? '…' : 'Generate PR' }}
+                </button>
+              }
+            </td>
+            <td>
+              <a class="pdf-link" [href]="pdfUrl(s.id)" target="_blank" rel="noopener">Download</a>
+            </td>
+            <td>
+              <button type="button" (click)="sendReport(s)" [disabled]="busyId === s.id">
+                {{ busyId === s.id ? '…' : 'Send report' }}
+              </button>
+              @if (s.status === 'running') {
+                <button type="button" (click)="stopScan(s)" [disabled]="stoppingScanId === s.id">
+                  {{ stoppingScanId === s.id ? 'Stopping…' : 'Stop' }}
+                </button>
+              }
+              @if (s.status === 'stopped') {
+                <button type="button" (click)="rerunScan(s)" [disabled]="rerunScanId === s.id">
+                  {{ rerunScanId === s.id ? 'Starting…' : 'Re-run' }}
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="11" class="muted">No scans yet. Run a scan from Domains.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (filteredScans.length > pageSize) {
+      <div class="pagination">
+        <button type="button" (click)="previousPage()" [disabled]="currentPage === 1">Prev</button>
+        <div class="page-numbers">
+          @for (p of pageNumbers; track p) {
+            <button type="button" (click)="goToPage(p)" [class.active]="p === currentPage">{{ p }}</button>
+          }
+        </div>
+        <span class="muted">Page {{ currentPage }} of {{ totalPages }}</span>
+        <button type="button" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+      </div>
+    }
+  </div>
+</div>

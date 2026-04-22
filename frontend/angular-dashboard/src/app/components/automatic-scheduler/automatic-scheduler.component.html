@@ -1,0 +1,95 @@
+<div class="page">
+  <header class="page-head">
+    <h1>Automatic scheduler</h1>
+    <p class="muted">Run scans on a schedule and email the report automatically.</p>
+  </header>
+
+  @if (schedulerError) {
+    <div class="banner error">{{ schedulerError }}</div>
+  }
+  @if (schedulerMessage) {
+    <div class="banner success">{{ schedulerMessage }}</div>
+  }
+
+  <section class="panel">
+    <h2>Add a schedule</h2>
+    <p class="muted small">
+      Enter a domain and email, then save. The scheduler runs for registered domains using the API server timezone.
+    </p>
+
+    <div class="scheduler-form">
+      <label>
+        Frequency
+        <select [(ngModel)]="schedulerFrequency">
+          <option value="1 day">1 day</option>
+          <option value="1 week">1 week</option>
+          <option value="1 month">1 month</option>
+        </select>
+      </label>
+
+      <label>
+        Domain
+        <input type="text" [(ngModel)]="schedulerDomain" placeholder="www.example.com" />
+      </label>
+
+      <label>
+        Email
+        <input type="email" [(ngModel)]="schedulerEmail" placeholder="you@company.com" />
+      </label>
+
+      <button type="button" (click)="saveScheduler()" [disabled]="schedulerSaving">
+        {{ schedulerSaving ? 'Saving...' : 'Save Scheduler' }}
+      </button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Scheduled scans</h2>
+    <p class="muted small">All saved schedules for this workspace. Times use the API server timezone.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Frequency</th>
+            <th>Email</th>
+            <th>Last run</th>
+            <th>Next run</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of scheduledScans; track row.domain) {
+            <tr>
+              <td>{{ row.domain }}</td>
+              <td>{{ row.frequency }}</td>
+              <td>{{ row.email }}</td>
+              <td>{{ row.lastRun ? (row.lastRun | date : 'medium') : '—' }}</td>
+              <td>{{ row.nextRun ? (row.nextRun | date : 'medium') : '—' }}</td>
+              <td>
+                <span class="state-pill" [class.off]="!row.active">{{ row.active ? 'Active' : 'Disabled' }}</span>
+              </td>
+              <td>
+                @if (row.active) {
+                  <button type="button" class="cta-danger" (click)="markInactive(row.domain)" [disabled]="schedulerSaving">
+                    Inactive
+                  </button>
+                } @else {
+                  <button type="button" class="cta-success" (click)="markActive(row.domain)" [disabled]="schedulerSaving">
+                    Reactive
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+          @empty {
+            <tr>
+              <td colspan="7" class="muted">No scheduled domains yet.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

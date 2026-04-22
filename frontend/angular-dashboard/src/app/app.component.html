@@ -1,0 +1,19 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo">◇</span>
+      <span>{{ title }}</span>
+    </div>
+    <nav>
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+      <a routerLink="/domains" routerLinkActive="active">Domains</a>
+      <a routerLink="/scans" routerLinkActive="active">Scans</a>
+      <a routerLink="/automatic-scheduler" routerLinkActive="active">Automatic Scheduler</a>
+      <a routerLink="/issue-create" routerLinkActive="active">Issue Create</a>
+      <a routerLink="/settings" routerLinkActive="active">Settings</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <router-outlet />
+  </main>
+</div>
