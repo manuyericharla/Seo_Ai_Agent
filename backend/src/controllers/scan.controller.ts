@@ -115,6 +115,152 @@ export function getPageReportsJson(req: Request, res: Response): void {
   }
 }
 
+export function getKeywordOpportunities(req: Request, res: Response): void {
+  try {
+    const scanId = Number(req.params.scanId);
+    if (!Number.isFinite(scanId) || scanId < 1) {
+      res.status(400).json({ error: 'Invalid scan id' });
+      return;
+    }
+
+    const rawLimit = Number(req.query.limit);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(50, Math.floor(rawLimit)) : 10;
+
+    const stored = loadScanReportFile(scanId);
+    if (!stored) {
+      res.status(404).json({ error: 'No page-level report file for this scan (run a new scan).' });
+      return;
+    }
+
+    const opportunities = Object.values(stored.pageReports)
+      .map((rep) => ({
+        url: rep.url,
+        targetKeyword: rep.keywordInsights?.targetKeyword || '',
+        opportunityScore: rep.keywordInsights?.opportunityScore ?? 0,
+        trendBoost: rep.keywordInsights?.trendBoost ?? 0,
+        keywordPlacementScore: rep.keywordInsights?.keywordPlacementScore ?? 0,
+        rankingProbability: rep.keywordInsights?.rankingProbability ?? 0,
+        topIssues: rep.issues.slice(0, 3).map((i) => i.type),
+      }))
+      .sort((a, b) => {
+        if (b.opportunityScore !== a.opportunityScore) return b.opportunityScore - a.opportunityScore;
+        if (b.trendBoost !== a.trendBoost) return b.trendBoost - a.trendBoost;
+        return b.rankingProbability - a.rankingProbability;
+      })
+      .slice(0, limit);
+
+    res.json({
+      scanId,
+      domain: stored.domain,
+      generatedAt: stored.generatedAt,
+      totalPages: Object.keys(stored.pageReports).length,
+      items: opportunities,
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+}
+
+export function getLatestKeywordOpportunities(req: Request, res: Response): void {
+  try {
+    const db = getDb();
+    const latest = db
+      .prepare(
+        `SELECT id
+         FROM scans
+         WHERE status = 'completed'
+         ORDER BY completed_at DESC, id DESC
+         LIMIT 1`
+      )
+      .get() as { id: number } | undefined;
+
+    if (!latest) {
+      res.status(404).json({ error: 'No completed scans found yet.' });
+      return;
+    }
+
+    req.params.scanId = String(latest.id);
+    getKeywordOpportunities(req, res);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+}
+
+export function getBacklinkAnalytics(req: Request, res: Response): void {
+  try {
+    const scanId = Number(req.params.scanId);
+    if (!Number.isFinite(scanId) || scanId < 1) {
+      res.status(400).json({ error: 'Invalid scan id' });
+      return;
+    }
+
+    const stored = loadScanReportFile(scanId);
+    if (!stored) {
+      res.status(404).json({ error: 'No page-level report file for this scan (run a new scan).' });
+      return;
+    }
+
+    const pages = Object.values(stored.pageReports).map((rep) => ({
+      url: rep.url,
+      internalReferringPages: rep.backlinkInsights?.internalReferringPages ?? 0,
+      uniqueExternalDomainsLinked: rep.backlinkInsights?.uniqueExternalDomainsLinked ?? 0,
+      externalLinksCount: rep.backlinkInsights?.externalLinksCount ?? 0,
+      internalAuthorityScore: rep.backlinkInsights?.internalAuthorityScore ?? 0,
+      backlinkQualityScore: rep.backlinkInsights?.backlinkQualityScore ?? 0,
+    }));
+
+    const totalInternalReferrals = pages.reduce((n, p) => n + p.internalReferringPages, 0);
+    const avgBacklinkQualityScore = pages.length
+      ? Math.round((pages.reduce((n, p) => n + p.backlinkQualityScore, 0) / pages.length) * 10) / 10
+      : 0;
+
+    const topPages = [...pages]
+      .sort((a, b) => b.backlinkQualityScore - a.backlinkQualityScore)
+      .slice(0, 10);
+
+    res.json({
+      scanId,
+      domain: stored.domain,
+      generatedAt: stored.generatedAt,
+      summary: {
+        pagesAnalyzed: pages.length,
+        totalInternalReferrals,
+        avgBacklinkQualityScore,
+      },
+      topPages,
+      items: pages,
+      note: 'Free-mode backlink analytics are based on internal link authority and external link diversity signals.',
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+}
+
+export function getLatestBacklinkAnalytics(req: Request, res: Response): void {
+  try {
+    const db = getDb();
+    const latest = db
+      .prepare(
+        `SELECT id
+         FROM scans
+         WHERE status = 'completed'
+         ORDER BY completed_at DESC, id DESC
+         LIMIT 1`
+      )
+      .get() as { id: number } | undefined;
+
+    if (!latest) {
+      res.status(404).json({ error: 'No completed scans found yet.' });
+      return;
+    }
+
+    req.params.scanId = String(latest.id);
+    getBacklinkAnalytics(req, res);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+}
+
 export async function getScanReportPdf(req: Request, res: Response): Promise<void> {
   try {
     const scanId = Number(req.params.scanId);

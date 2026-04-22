@@ -103,6 +103,16 @@ function clampScore(score: number): number {
   return Math.max(0, Math.min(100, score));
 }
 
+function keywordQuickAction(rep: SeoPageReport): string {
+  const issueTypes = new Set(rep.issues.map((i) => i.type));
+  if (issueTypes.has('missing_title')) return 'Add unique title with primary keyword near start.';
+  if (issueTypes.has('missing_meta_description')) return 'Write CTR-focused meta description (120-160 chars).';
+  if (issueTypes.has('duplicate_title')) return 'Replace duplicate title with page-specific intent.';
+  if (issueTypes.has('low_word_count')) return 'Expand body with intent-matched topical depth.';
+  if (issueTypes.has('slow_page')) return 'Improve speed to protect rank and engagement.';
+  return 'Strengthen keyword coverage across title, H1, and intro.';
+}
+
 /** Professional per-page audit (preferred). */
 export function buildScanReportPdfFromPageReports(
   meta: ScanPdfMeta,
@@ -405,7 +415,34 @@ export function buildScanReportPdfFromPageReports(
       { fontSize: 7, rowPadding: 2 }
     );
 
-    sectionTitle('5. AI Content Improvements');
+    sectionTitle('5. Top Keyword Opportunities (Free Algorithm)');
+    const opportunityRows = pages
+      .map((rep) => ({
+        url: displayUrl(rep.url),
+        keyword: rep.keywordInsights?.targetKeyword || 'n/a',
+        opportunity: rep.keywordInsights?.opportunityScore ?? 0,
+        trendBoost: rep.keywordInsights?.trendBoost ?? 0,
+        placement: rep.keywordInsights?.keywordPlacementScore ?? 0,
+        rankProb: rep.keywordInsights?.rankingProbability ?? 0,
+        action: keywordQuickAction(rep),
+      }))
+      .sort((a, b) => b.opportunity - a.opportunity)
+      .slice(0, 10);
+    drawTable(
+      [
+        { key: 'url', title: 'Page URL', width: 160 },
+        { key: 'keyword', title: 'Target Keyword', width: 130 },
+        { key: 'opportunity', title: 'Opportunity', width: 80, align: 'center' },
+        { key: 'trendBoost', title: 'Trend Boost', width: 80, align: 'center' },
+        { key: 'placement', title: 'Placement', width: 80, align: 'center' },
+        { key: 'rankProb', title: 'Rank %', width: 65, align: 'center' },
+        { key: 'action', title: 'Quick Action', width: 165 },
+      ],
+      opportunityRows,
+      { fontSize: 8, rowPadding: 3 }
+    );
+
+    sectionTitle('6. AI Content Improvements');
     drawTable(
       [
         { key: 'page', title: 'Page', width: 210 },
@@ -424,7 +461,7 @@ export function buildScanReportPdfFromPageReports(
       { fontSize: 7, rowPadding: 2 }
     );
 
-    sectionTitle('6. Technical SEO Recommendations');
+    sectionTitle('7. Technical SEO Recommendations');
     drawTable(
       [
         { key: 'area', title: 'Area', width: 240 },
@@ -439,7 +476,7 @@ export function buildScanReportPdfFromPageReports(
       ]
     );
 
-    sectionTitle('7. Priority Action Plan');
+    sectionTitle('8. Priority Action Plan');
     drawTable(
       [
         { key: 'priority', title: 'Priority', width: 120, align: 'center' },
@@ -454,7 +491,7 @@ export function buildScanReportPdfFromPageReports(
       ]
     );
 
-    sectionTitle('8. Overall SEO Opportunity Summary');
+    sectionTitle('9. Overall SEO Opportunity Summary');
     const currentContent = pages.length ? Math.round(pages.reduce((s, p) => s + (p.scoreBreakdown?.content ?? 50), 0) / pages.length) : 0;
     const currentTechnical = pages.length ? Math.round(pages.reduce((s, p) => s + (p.scoreBreakdown?.technical ?? 50), 0) / pages.length) : 0;
     const currentRanking = pages.length ? Math.round(pages.reduce((s, p) => s + (p.keywordInsights?.rankingProbability ?? 35), 0) / pages.length) : 0;

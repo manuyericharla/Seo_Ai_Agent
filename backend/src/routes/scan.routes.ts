@@ -16,6 +16,10 @@ import {
   getSeoTrend,
   getScanReportPdf,
   getPageReportsJson,
+  getKeywordOpportunities,
+  getLatestKeywordOpportunities,
+  getBacklinkAnalytics,
+  getLatestBacklinkAnalytics,
   postStopScan,
 } from '../controllers/scan.controller';
 
@@ -43,6 +47,10 @@ scanRouter.get('/reports/:scanId/pdf', (req, res) => {
   void getScanReportPdf(req, res);
 });
 scanRouter.get('/reports/:scanId/json', getPageReportsJson);
+scanRouter.get('/reports/:scanId/keyword-opportunities', getKeywordOpportunities);
+scanRouter.get('/reports/latest/keyword-opportunities', getLatestKeywordOpportunities);
+scanRouter.get('/reports/:scanId/backlink-analytics', getBacklinkAnalytics);
+scanRouter.get('/reports/latest/backlink-analytics', getLatestBacklinkAnalytics);
 scanRouter.get('/reports', getReports);
 scanRouter.post('/send-report', (req, res) => {
   void postSendReport(req, res);

@@ -33,6 +33,17 @@ type PageAiResponse = {
   };
 };
 
+type BacklinkSignalsByUrl = Map<
+  string,
+  {
+    internalReferringPages: number;
+    uniqueExternalDomainsLinked: number;
+    externalLinksCount: number;
+    internalAuthorityScore: number;
+    backlinkQualityScore: number;
+  }
+>;
+
 function buildAggregatePrompt(summary: AggregateAudit): string {
   return `You are an expert technical SEO consultant.
 
@@ -186,6 +197,138 @@ function bodyCopySuggestion(page: CrawlPageResult): string {
     `This page should clearly explain core features, expected outcomes, and real-world use cases for decision-makers. ` +
     `Add a concise value proposition, trust signals, and a clear next step so users can evaluate fit and take action confidently.`
   ).slice(0, 700);
+}
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/[\s-]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 2);
+}
+
+function uniqueCount(arr: string[]): number {
+  return new Set(arr).size;
+}
+
+function hasAny(text: string, words: string[]): boolean {
+  const lower = text.toLowerCase();
+  return words.some((w) => lower.includes(w));
+}
+
+function computeTrendBoost(page: CrawlPageResult): number {
+  const nowYear = new Date().getFullYear();
+  const url = page.url.toLowerCase();
+  const title = page.title.toLowerCase();
+  const freshnessTerms = ['new', 'latest', 'best', 'top', 'guide', 'update', 'trends', '2025', '2026'];
+  const yearSignal = [String(nowYear), String(nowYear - 1)].some((y) => url.includes(y) || title.includes(y));
+  const termSignal = hasAny(`${url} ${title}`, freshnessTerms);
+  const recencyBonus = yearSignal ? 12 : 0;
+  const termBonus = termSignal ? 8 : 0;
+  return Math.min(25, recencyBonus + termBonus);
+}
+
+function computeFreeKeywordInsights(
+  page: CrawlPageResult,
+  seoScore: number,
+  issueTypes: string[]
+): SeoPageReport['keywordInsights'] {
+  const topic = pageTopic(page).toLowerCase();
+  const topicTokens = tokenize(topic);
+  const titleTokens = tokenize(page.title);
+  const headingTokens = tokenize((page.headings || []).join(' '));
+  const bodyTokens = tokenize(page.contentSnippet || '');
+
+  const keyword = topic || 'general topic';
+  const relevanceOverlap = uniqueCount(topicTokens.filter((t) => titleTokens.includes(t) || headingTokens.includes(t)));
+  const relevanceBase = topicTokens.length ? Math.round((relevanceOverlap / topicTokens.length) * 100) : 50;
+  const titleMatchBoost = page.title.toLowerCase().includes(keyword) ? 15 : 0;
+  const headingMatchBoost = (page.headings[0] || '').toLowerCase().includes(keyword) ? 12 : 0;
+  const bodySupportBoost = bodyTokens.some((t) => topicTokens.includes(t)) ? 8 : 0;
+  const keywordPlacementScore = Math.max(10, Math.min(100, relevanceBase + titleMatchBoost + headingMatchBoost + bodySupportBoost));
+
+  // Free "opportunity" model: prioritize pages likely to gain from better snippets/content.
+  const ctrGap =
+    (issueTypes.includes('missing_title') ? 18 : 0) +
+    (issueTypes.includes('missing_meta_description') ? 20 : 0) +
+    (issueTypes.includes('duplicate_title') ? 12 : 0);
+  const positionGap = seoScore >= 50 && seoScore <= 80 ? 18 : seoScore < 50 ? 10 : 6;
+  const trendBoost = computeTrendBoost(page);
+  const intentMatchBoost = hasAny(page.url, ['/blog', '/guide', '/services', '/product']) ? 8 : 4;
+  const technicalDrag =
+    (issueTypes.includes('slow_page') ? 8 : 0) +
+    (issueTypes.includes('broken_links') ? 10 : 0) +
+    (issueTypes.includes('invalid_or_nonfunctional_link') ? 6 : 0);
+
+  const opportunityScore = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(keywordPlacementScore * 0.4 + ctrGap * 0.2 + positionGap * 0.15 + trendBoost * 0.15 + intentMatchBoost * 0.1 - technicalDrag)
+    )
+  );
+  const rankingProbability = Math.max(5, Math.min(95, Math.round(opportunityScore * 0.9 + (seoScore * 0.25))));
+
+  return {
+    targetKeyword: keyword,
+    keywordPlacementScore,
+    rankingProbability,
+    opportunityScore,
+    trendBoost,
+  };
+}
+
+function computeBacklinkSignals(pages: CrawlPageResult[]): BacklinkSignalsByUrl {
+  const byUrl: BacklinkSignalsByUrl = new Map();
+  const knownUrls = new Set(pages.map((p) => p.url));
+  const incomingInternal = new Map<string, Set<string>>();
+
+  for (const p of pages) {
+    for (const href of p.links || []) {
+      if (!knownUrls.has(href) || href === p.url) continue;
+      const bucket = incomingInternal.get(href) ?? new Set<string>();
+      bucket.add(p.url);
+      incomingInternal.set(href, bucket);
+    }
+  }
+
+  for (const p of pages) {
+    const fromHost = new URL(p.url).hostname.replace(/^www\./, '');
+    const externalDomains = new Set<string>();
+    let externalLinksCount = 0;
+    for (const href of p.links || []) {
+      try {
+        const to = new URL(href);
+        const toHost = to.hostname.replace(/^www\./, '');
+        if (toHost !== fromHost) {
+          externalDomains.add(toHost);
+          externalLinksCount++;
+        }
+      } catch {
+        // Ignore malformed URLs.
+      }
+    }
+
+    const internalReferringPages = incomingInternal.get(p.url)?.size ?? 0;
+    const internalAuthorityScore = Math.max(0, Math.min(100, 25 + internalReferringPages * 9));
+    const externalDiversityBonus = Math.min(20, externalDomains.size * 2);
+    const externalVolumePenalty = externalLinksCount > 50 ? 10 : externalLinksCount > 25 ? 5 : 0;
+    const backlinkQualityScore = Math.max(
+      0,
+      Math.min(100, Math.round(internalAuthorityScore * 0.75 + externalDiversityBonus - externalVolumePenalty))
+    );
+
+    byUrl.set(p.url, {
+      internalReferringPages,
+      uniqueExternalDomainsLinked: externalDomains.size,
+      externalLinksCount,
+      internalAuthorityScore,
+      backlinkQualityScore,
+    });
+  }
+
+  return byUrl;
 }
 
 function localContentImprovements(page: CrawlPageResult, issueTypes: string[]): string[] {
@@ -467,8 +610,9 @@ export async function analyzePagesWithAiWithSignals(
   const aiFixes = aggregateAi.issueFixes ?? {};
   const MAX_PAGE_AI_REWRITES = 15;
   let pageRewriteCalls = 0;
+  const backlinkSignalsByUrl = computeBacklinkSignals(pages);
 
-    const calcWeighted = (
+  const calcWeighted = (
     page: CrawlPageResult,
     issueTypes: string[],
     duplicateTitle: boolean,
@@ -507,7 +651,7 @@ export async function analyzePagesWithAiWithSignals(
       (perf?.inpMs && perf.inpMs > 500 ? 20 : perf?.inpMs && perf.inpMs > 200 ? 10 : 0) +
       (issueTypes.includes('slow_page') ? 15 : 0);
     const ux = Math.max(0, 100 - uxPenaltyFromSpeed);
-    const backlinks = 45; // Placeholder until backlink provider integration.
+    const backlinks = backlinkSignalsByUrl.get(page.url)?.backlinkQualityScore ?? 45;
     const weightedTotal = Math.round(content * 0.25 + technical * 0.2 + backlinks * 0.2 + onPage * 0.2 + ux * 0.15);
     return { content, technical, backlinks, onPage, ux, weightedTotal };
   };
@@ -557,6 +701,7 @@ export async function analyzePagesWithAiWithSignals(
 
     const issueTypes = [...new Set(issues.map((x) => x.type))];
     const perf = perfByUrl.get(p.url);
+    const backlinkInsights = backlinkSignalsByUrl.get(p.url);
     const localEnhanced = buildLocalPasteReadyFixes(p, issueTypes, isDuplicateTitle);
 
     let pageAi = null as PageAiResponse | null;
@@ -580,15 +725,13 @@ export async function analyzePagesWithAiWithSignals(
       if (issueSpecific) issue.fix = issueSpecific;
     }
 
+    const seoScore = computeSeoScore(p, isDuplicateTitle);
     const r: SeoPageReport = {
       url: p.url,
-      seoScore: computeSeoScore(p, isDuplicateTitle),
+      seoScore,
       scoreBreakdown: calcWeighted(p, issueTypes, isDuplicateTitle, perf),
-      keywordInsights: {
-        targetKeyword: pageTopic(p).toLowerCase(),
-        keywordPlacementScore: Math.max(10, Math.min(100, p.title ? 70 : 40)),
-        rankingProbability: Math.max(5, Math.min(95, Math.round((computeSeoScore(p, isDuplicateTitle) / 100) * 65))),
-      },
+      keywordInsights: computeFreeKeywordInsights(p, seoScore, issueTypes),
+      backlinkInsights,
       performanceMetrics: perf
         ? { source: 'pagespeed', lcpMs: perf.lcpMs, cls: perf.cls, inpMs: perf.inpMs, ttfbMs: perf.ttfbMs }
         : { source: 'crawl_estimate', lcpMs: p.loadTimeMs },

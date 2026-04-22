@@ -56,6 +56,15 @@ export interface SeoPageReport {
     targetKeyword: string;
     keywordPlacementScore: number;
     rankingProbability: number;
+    opportunityScore?: number;
+    trendBoost?: number;
+  };
+  backlinkInsights?: {
+    internalReferringPages: number;
+    uniqueExternalDomainsLinked: number;
+    externalLinksCount: number;
+    internalAuthorityScore: number;
+    backlinkQualityScore: number;
   };
   performanceMetrics?: {
     source: 'pagespeed' | 'crawl_estimate';
