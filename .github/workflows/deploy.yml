@@ -165,16 +165,11 @@ jobs:
           docker volume create hiperbrains-${ENV}-data || true
  
           echo "Creating .env file..."
-
-          cat <<EOF > .env
-
-NODE_ENV=production
-
-PORT=8080
-
-DB_PATH=/app/data/app.db
-
-EOF
+          {
+            echo "NODE_ENV=production"
+            echo "PORT=8080"
+            echo "DB_PATH=/app/data/app.db"
+          } > .env
  
           echo "Starting new container..."
 
