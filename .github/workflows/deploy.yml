@@ -1,0 +1,210 @@
+name: Build & Deploy Hiperbrains API
+ 
+on:
+
+  workflow_dispatch:
+
+  push:
+
+    branches:
+
+      - DEV
+
+      - QA
+
+      - DEMO24
+
+      - main
+ 
+concurrency:
+
+  group: ec2-${{ github.ref_name }}
+
+  cancel-in-progress: false
+ 
+jobs:
+
+  deploy:
+
+    name: Deploy - ${{ github.ref_name }}
+ 
+    concurrency:
+
+      group: repo-${{ github.repository }}-${{ github.ref_name }}
+
+      cancel-in-progress: false
+ 
+    runs-on:
+
+      - self-hosted
+
+      - ${{ 
+
+          github.ref_name == 'DEV' && 'dev' ||
+
+          github.ref_name == 'QA' && 'qa' ||
+
+          github.ref_name == 'DEMO24' && 'uat' ||
+
+          'prod'
+
+        }}
+ 
+    steps:
+ 
+      # ------------------------------------------------------------
+
+      # Checkout
+
+      # ------------------------------------------------------------
+
+      - name: Checkout
+
+        uses: actions/checkout@v3
+
+        with:
+
+          fetch-depth: 0
+ 
+      # ------------------------------------------------------------
+
+      # Resolve Environment
+
+      # ------------------------------------------------------------
+
+      - name: Resolve Environment
+
+        run: |
+
+          case "${{ github.ref_name }}" in
+
+            DEV)
+
+              echo "ENV=DEV" >> $GITHUB_ENV
+
+              echo "CONFIG_URL=${{ secrets.CONFIG_SERVER_DEV }}" >> $GITHUB_ENV
+
+              ;;
+
+            QA)
+
+              echo "ENV=QA" >> $GITHUB_ENV
+
+              echo "CONFIG_URL=${{ secrets.CONFIG_SERVER_QA }}" >> $GITHUB_ENV
+
+              ;;
+
+            DEMO24)
+
+              echo "ENV=DEMO" >> $GITHUB_ENV
+
+              echo "CONFIG_URL=${{ secrets.CONFIG_SERVER_DEMO }}" >> $GITHUB_ENV
+
+              ;;
+
+            main)
+
+              echo "ENV=PROD" >> $GITHUB_ENV
+
+              echo "CONFIG_URL=${{ secrets.CONFIG_SERVER_PROD }}" >> $GITHUB_ENV
+
+              ;;
+
+          esac
+ 
+          echo "GIT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+          echo "IMAGE_NAME=$(basename "$GITHUB_REPOSITORY")" >> $GITHUB_ENV
+ 
+      # ------------------------------------------------------------
+
+      # AWS Credentials
+
+      # ------------------------------------------------------------
+
+      - name: Configure AWS
+
+        run: |
+
+          aws configure set aws_access_key_id ${{ secrets.ACCESSKEYID }}
+
+          aws configure set aws_secret_access_key ${{ secrets.SECRETKEYID }}
+ 
+      # ------------------------------------------------------------
+
+      # Build & Deploy
+
+      # ------------------------------------------------------------
+
+      - name: Build & Deploy Container
+
+        run: |
+
+          IMAGE_TAG="${IMAGE_NAME}:${ENV}-${GIT_SHA}"
+
+          CONTAINER_NAME="SEOAgent"
+ 
+          echo "Container: $CONTAINER_NAME"
+
+          echo "Image: $IMAGE_TAG"
+
+          echo "Using Port: 8011"
+ 
+          echo "Building image..."
+
+          docker build --no-cache -t "$IMAGE_TAG" .
+ 
+          echo "Stopping existing container..."
+
+          docker stop "$CONTAINER_NAME" 2>/dev/null || true
+
+          docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+ 
+          echo "Creating volume..."
+
+          docker volume create hiperbrains-${ENV}-data || true
+ 
+          echo "Creating .env file..."
+
+          cat <<EOF > .env
+
+NODE_ENV=production
+
+PORT=8080
+
+DB_PATH=/app/data/app.db
+
+EOF
+ 
+          echo "Starting new container..."
+
+          docker run -d \
+
+            --name "$CONTAINER_NAME" \
+
+            -p 8011:8080 \
+
+            --env-file .env \
+
+            -e ConfigUrl="$CONFIG_URL" \
+
+            -v hiperbrains-${ENV}-data:/app/data \
+
+            --restart unless-stopped \
+
+            --log-driver=awslogs \
+
+            --log-opt awslogs-region=us-east-2 \
+
+            --log-opt awslogs-group=hiperbrains-api \
+
+            --log-opt awslogs-create-group=true \
+
+            --log-opt awslogs-stream="$CONTAINER_NAME" \
+
+            "$IMAGE_TAG"
+ 
+          echo "Cleaning unused images..."
+
+          docker image prune -f
+ 
