@@ -130,7 +130,7 @@ jobs:
 
           aws configure set aws_secret_access_key ${{ secrets.SECRETKEYID }}
           echo "Access Key:"${{ secrets.ACCESSKEYID}}
-          echo "Access Key:"${{ secrets.SECRETKEYID}}
+          echo "Access Key:"${{ secrets.SECRETKEY}}
  
       # ------------------------------------------------------------
 
