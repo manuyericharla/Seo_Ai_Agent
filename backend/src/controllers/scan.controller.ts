@@ -793,7 +793,7 @@ export async function postSerpApiTest(req: Request, res: Response): Promise<void
   try {
     const keyword = String((req.body as { keyword?: string })?.keyword || 'seo audit tools').trim();
     const test = await testSerpApiConnection(keyword);
-    res.json({ ok: true, ...test, message: 'SerpAPI connection is working.' });
+    res.json({ ...test, message: 'SerpAPI connection is working.' });
   } catch (e) {
     res.status(502).json({ ok: false, error: String(e) });
   }

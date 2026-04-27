@@ -11,6 +11,8 @@ export interface SerpLiveRankResult {
   topResults: Array<{ position: number; title: string; link: string; snippet: string }>;
 }
 
+type SerpResultItem = { position: number; title: string; link: string; snippet: string };
+
 function getSerpApiKey(): string {
   return getSetting('SERPAPI_KEY') || process.env.SERPAPI_KEY || '';
 }
@@ -62,13 +64,13 @@ export async function fetchSerpLiveRank(params: {
   if (!resp.ok) throw new Error(`SerpAPI error (${resp.status})`);
   const json = (await resp.json()) as any;
   const organic = Array.isArray(json?.organic_results) ? json.organic_results : [];
-  const topResults = organic.slice(0, num).map((r: any) => ({
+  const topResults: SerpResultItem[] = organic.slice(0, num).map((r: any) => ({
     position: Number(r.position || 0),
     title: String(r.title || ''),
     link: String(r.link || ''),
     snippet: String(r.snippet || ''),
   }));
-  const match = topResults.find((r) => normDomain(r.link) === targetDomain);
+  const match = topResults.find((r: SerpResultItem) => normDomain(r.link) === targetDomain);
   return {
     keyword,
     targetDomain,
