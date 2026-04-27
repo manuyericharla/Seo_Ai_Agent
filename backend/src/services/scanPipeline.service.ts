@@ -178,7 +178,7 @@ export async function runScanPipeline(
       `UPDATE scans SET completed_at = datetime('now'), pages_count = ?, seo_score_avg = ?, status = 'completed' WHERE id = ?`
     ).run(pages.length, seoScoreAvg, effectiveScanId);
 
-    saveScanReportFile(effectiveScanId, domain, pageReports);
+    saveScanReportFile(effectiveScanId, domain, pageReports, pages);
     db.prepare('DELETE FROM issues WHERE scan_id = ?').run(effectiveScanId);
     const insertIssue = db.prepare(
       `INSERT INTO issues (scan_id, page_url, issue_type, message, ai_suggestion, status, seo_score, code_snippet, code_diff)

@@ -54,6 +54,27 @@
   color: var(--text);
 }
 
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+}
+
+.toggle-row label {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.toggle-row input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
 button[type='submit'] {
   align-self: flex-start;
   padding: 0.6rem 1.2rem;
@@ -63,4 +84,35 @@ button[type='submit'] {
   color: #0f172a;
   font-weight: 600;
   cursor: pointer;
+}
+
+.test-result {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.quality {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.quality.good {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.quality.needs {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.quality.poor {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.16);
 }

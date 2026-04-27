@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { config } from '../config/config';
-import type { SeoPageReport } from '../models/scan.model';
+import type { CrawlPageResult, SeoPageReport } from '../models/scan.model';
 
 function reportsDir(): string {
   return path.join(path.dirname(config.dbPath), 'reports');
@@ -12,9 +12,15 @@ export interface StoredScanReport {
   domain: string;
   generatedAt: string;
   pageReports: Record<string, SeoPageReport>;
+  pages?: CrawlPageResult[];
 }
 
-export function saveScanReportFile(scanId: number, domain: string, pageReports: Record<string, SeoPageReport>): void {
+export function saveScanReportFile(
+  scanId: number,
+  domain: string,
+  pageReports: Record<string, SeoPageReport>,
+  pages?: CrawlPageResult[]
+): void {
   const dir = reportsDir();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const payload: StoredScanReport = {
@@ -22,6 +28,7 @@ export function saveScanReportFile(scanId: number, domain: string, pageReports: 
     domain,
     generatedAt: new Date().toISOString(),
     pageReports,
+    pages,
   };
   fs.writeFileSync(path.join(dir, `${scanId}.json`), JSON.stringify(payload, null, 2), 'utf8');
 }

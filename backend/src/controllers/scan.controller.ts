@@ -16,9 +16,12 @@ import {
   suggestedFilename,
   ScanPdfIssueRow,
   ScanPdfMeta,
+  SerpRankRow,
 } from '../services/pdfReport.service';
 import { loadScanReportFile } from '../services/reportFile.service';
 import { registerActiveScan, stopActiveScan, unregisterActiveScan } from '../services/scanTaskRegistry.service';
+import { fetchPageSpeedMetrics } from '../services/pagespeed.service';
+import { fetchSerpLiveRank, testSerpApiConnection } from '../services/serpapi.service';
 
 export async function postScan(req: Request, res: Response): Promise<void> {
   try {
@@ -97,7 +100,55 @@ export function postStopScan(req: Request, res: Response): void {
   }
 }
 
-export function getPageReportsJson(req: Request, res: Response): void {
+async function buildSerpRankRowsForReports(
+  domain: string,
+  reports: Array<{
+    url: string;
+    keywordInsights?: { targetKeyword?: string; opportunityScore?: number };
+  }>
+): Promise<SerpRankRow[]> {
+  const liveEnabled = String(getSetting('ENABLE_LIVE_SERP_RANK') || process.env.ENABLE_LIVE_SERP_RANK || 'false')
+    .toLowerCase()
+    .trim();
+  if (liveEnabled !== 'true') return [];
+
+  const candidates = reports
+    .map((r) => ({
+      pageUrl: r.url,
+      keyword: String(r.keywordInsights?.targetKeyword || '').trim(),
+      opportunityScore: Number(r.keywordInsights?.opportunityScore ?? 0),
+    }))
+    .filter((r) => r.keyword.length >= 3)
+    .sort((a, b) => b.opportunityScore - a.opportunityScore)
+    .slice(0, 5);
+
+  const rows: SerpRankRow[] = [];
+  for (const c of candidates) {
+    try {
+      const live = await fetchSerpLiveRank({
+        keyword: c.keyword,
+        targetDomain: domain,
+        location: 'India',
+        device: 'desktop',
+        num: 30,
+      });
+      rows.push({
+        pageUrl: c.pageUrl,
+        keyword: c.keyword,
+        found: live.found,
+        position: live.position,
+        matchedUrl: live.matchedUrl,
+        location: live.location,
+        device: live.device,
+      });
+    } catch {
+      // Skip live SERP failures per keyword to avoid failing full report.
+    }
+  }
+  return rows;
+}
+
+export async function getPageReportsJson(req: Request, res: Response): Promise<void> {
   try {
     const scanId = Number(req.params.scanId);
     if (!Number.isFinite(scanId) || scanId < 1) {
@@ -109,7 +160,77 @@ export function getPageReportsJson(req: Request, res: Response): void {
       res.status(404).json({ error: 'No page-level report file for this scan (run a new scan).' });
       return;
     }
-    res.json(stored);
+    const reports = Object.values(stored.pageReports || {});
+    const avg = (arr: number[]): number => {
+      if (!arr.length) return 0;
+      return Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10;
+    };
+    const onPageTypes = new Set([
+      'missing_title',
+      'missing_meta_description',
+      'missing_h1',
+      'multiple_h1',
+      'duplicate_title',
+      'low_word_count',
+      'images_without_alt',
+      'missing_canonical',
+    ]);
+    const offPageTypes = new Set(['broken_links', 'invalid_or_nonfunctional_link']);
+
+    const onPageIssueCount = reports.reduce(
+      (n, r) => n + r.issues.filter((i) => onPageTypes.has(i.type)).length,
+      0
+    );
+    const offPageIssueCount = reports.reduce(
+      (n, r) => n + r.issues.filter((i) => offPageTypes.has(i.type)).length,
+      0
+    );
+
+    const onPageScores = reports.map((r) => r.scoreBreakdown?.onPage ?? r.seoScore).filter((n) => Number.isFinite(n));
+    const technicalScores = reports
+      .map((r) => r.scoreBreakdown?.technical ?? 0)
+      .filter((n) => Number.isFinite(n));
+    const backlinkScores = reports
+      .map((r) => r.backlinkInsights?.backlinkQualityScore ?? r.scoreBreakdown?.backlinks ?? 0)
+      .filter((n) => Number.isFinite(n));
+    const internalReferrals = reports.reduce((n, r) => n + (r.backlinkInsights?.internalReferringPages ?? 0), 0);
+    const uniqueExternalDomains = reports.reduce((n, r) => n + (r.backlinkInsights?.uniqueExternalDomainsLinked ?? 0), 0);
+
+    const serpRankRows = await buildSerpRankRowsForReports(stored.domain, reports);
+
+    const payload: any = {
+      ...stored,
+      onPageAnalysis: {
+        avgOnPageScore: avg(onPageScores),
+        avgTechnicalScore: avg(technicalScores),
+        issueCount: onPageIssueCount,
+        topIssueTypes: Object.entries(
+          reports
+            .flatMap((r) => r.issues.map((i) => i.type))
+            .filter((t) => onPageTypes.has(t))
+            .reduce<Record<string, number>>((acc, t) => {
+              acc[t] = (acc[t] || 0) + 1;
+              return acc;
+            }, {})
+        )
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([type, count]) => ({ type, count })),
+      },
+      offPageAnalysis: {
+        avgOffPageScore: avg(backlinkScores),
+        issueCount: offPageIssueCount,
+        totalInternalReferrals: internalReferrals,
+        totalUniqueExternalDomainsLinked: uniqueExternalDomains,
+        note: 'Current off-page analysis is free-mode, derived from internal link authority and external domain diversity signals.',
+      },
+      liveRankAnalysis: {
+        provider: 'serpapi',
+        rows: serpRankRows,
+        note: 'Live Google positions for top keyword opportunities.',
+      },
+    };
+    res.json(payload);
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -261,6 +382,83 @@ export function getLatestBacklinkAnalytics(req: Request, res: Response): void {
   }
 }
 
+export function getImageAltRouteMap(req: Request, res: Response): void {
+  try {
+    const scanId = Number(req.params.scanId);
+    if (!Number.isFinite(scanId) || scanId < 1) {
+      res.status(400).json({ error: 'Invalid scan id' });
+      return;
+    }
+
+    const stored = loadScanReportFile(scanId);
+    if (!stored) {
+      res.status(404).json({ error: 'No page-level report file for this scan (run a new scan).' });
+      return;
+    }
+
+    if (!stored.pages || stored.pages.length === 0) {
+      res.status(404).json({
+        error:
+          'No image route map found in this scan report. Run a new scan to capture per-route image ALT details.',
+      });
+      return;
+    }
+
+    const routes = stored.pages.map((page) => {
+      const images = (page.images || []).map((img) => ({
+        src: img.src,
+        alt: img.alt || '',
+        suggestedAlt: img.suggestedAlt || '',
+        hasAlt: Boolean(img.alt && img.alt.trim()),
+      }));
+      return {
+        route: page.url,
+        totalImages: images.length,
+        missingAltCount: images.filter((i) => !i.hasAlt).length,
+        images,
+      };
+    });
+
+    res.json({
+      scanId,
+      domain: stored.domain,
+      generatedAt: stored.generatedAt,
+      totalRoutes: routes.length,
+      totalImages: routes.reduce((n, r) => n + r.totalImages, 0),
+      missingAltImages: routes.reduce((n, r) => n + r.missingAltCount, 0),
+      routes,
+      note: 'Use suggestedAlt values as draft ALT text for CMS/WordPress updates.',
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+}
+
+export function getLatestImageAltRouteMap(req: Request, res: Response): void {
+  try {
+    const db = getDb();
+    const latest = db
+      .prepare(
+        `SELECT id
+         FROM scans
+         WHERE status = 'completed'
+         ORDER BY completed_at DESC, id DESC
+         LIMIT 1`
+      )
+      .get() as { id: number } | undefined;
+
+    if (!latest) {
+      res.status(404).json({ error: 'No completed scans found yet.' });
+      return;
+    }
+
+    req.params.scanId = String(latest.id);
+    getImageAltRouteMap(req, res);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+}
+
 export async function getScanReportPdf(req: Request, res: Response): Promise<void> {
   try {
     const scanId = Number(req.params.scanId);
@@ -312,7 +510,9 @@ export async function getScanReportPdf(req: Request, res: Response): Promise<voi
     const stored = loadScanReportFile(scanId);
     let pdf: Buffer;
     if (stored?.pageReports && Object.keys(stored.pageReports).length > 0) {
-      pdf = await buildScanReportPdfFromPageReports(meta, stored.pageReports);
+      const reports = Object.values(stored.pageReports);
+      const serpRankRows = await buildSerpRankRowsForReports(row.domain, reports);
+      pdf = await buildScanReportPdfFromPageReports(meta, stored.pageReports, serpRankRows);
     } else {
       const issues = db
         .prepare(
@@ -476,6 +676,9 @@ export function getActivity(_req: Request, res: Response): void {
 export function getSettings(_req: Request, res: Response): void {
   const keys = [
     'OPENAI_API_KEY',
+    'GOOGLE_API_KEY',
+    'SERPAPI_KEY',
+    'ENABLE_LIVE_SERP_RANK',
     'GITHUB_TOKEN',
     'GITHUB_REPO',
     'GITHUB_REPO_OWNER',
@@ -518,6 +721,9 @@ export function putSettings(req: Request, res: Response): void {
   const body = req.body as Record<string, string>;
   const allowed = new Set([
     'OPENAI_API_KEY',
+    'GOOGLE_API_KEY',
+    'SERPAPI_KEY',
+    'ENABLE_LIVE_SERP_RANK',
     'GITHUB_TOKEN',
     'GITHUB_REPO',
     'GITHUB_REPO_OWNER',
@@ -546,6 +752,79 @@ export function putSettings(req: Request, res: Response): void {
     setSetting(k, v);
   }
   res.json({ ok: true });
+}
+
+export async function postGooglePageSpeedTest(req: Request, res: Response): Promise<void> {
+  try {
+    const url = String((req.body as { url?: string })?.url || 'https://example.com').trim();
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      res.status(400).json({ ok: false, error: 'Invalid URL' });
+      return;
+    }
+    if (!/^https?:$/i.test(parsed.protocol)) {
+      res.status(400).json({ ok: false, error: 'Only http/https URLs are supported' });
+      return;
+    }
+
+    const metrics = await fetchPageSpeedMetrics(parsed.toString());
+    if (!metrics) {
+      res.status(502).json({
+        ok: false,
+        error: 'PageSpeed API call failed. Check GOOGLE_API_KEY quota/restrictions and URL accessibility.',
+      });
+      return;
+    }
+
+    res.json({
+      ok: true,
+      url: parsed.toString(),
+      metrics,
+      message: 'Google PageSpeed API connection is working.',
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+}
+
+export async function postSerpApiTest(req: Request, res: Response): Promise<void> {
+  try {
+    const keyword = String((req.body as { keyword?: string })?.keyword || 'seo audit tools').trim();
+    const test = await testSerpApiConnection(keyword);
+    res.json({ ok: true, ...test, message: 'SerpAPI connection is working.' });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: String(e) });
+  }
+}
+
+export async function postSerpLiveRank(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as {
+      keyword?: string;
+      targetDomain?: string;
+      location?: string;
+      device?: 'desktop' | 'mobile';
+      num?: number;
+    };
+    const keyword = String(body.keyword || '').trim();
+    const targetDomain = String(body.targetDomain || '').trim();
+    if (!keyword || !targetDomain) {
+      res.status(400).json({ ok: false, error: 'keyword and targetDomain are required.' });
+      return;
+    }
+    const data = await fetchSerpLiveRank({
+      keyword,
+      targetDomain,
+      location: body.location || 'India',
+      device: body.device === 'mobile' ? 'mobile' : 'desktop',
+      num: body.num,
+    });
+    res.json({ ok: true, data });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: String(e) });
+  }
 }
 
 export async function postIssuePullRequest(req: Request, res: Response): Promise<void> {

@@ -1,7 +1,11 @@
 <div class="page">
   <header class="page-head">
     <h1>Scan history</h1>
-    <p class="muted">Recent scans with pages, SEO score, email, and GitHub automation status.</p>
+    <p class="muted">Recent scans with pages, SEO score, email, and GitHub automation status. Off-page reporting uses free crawl-based signals.</p>
+    <p class="muted">
+      <span class="live-rank-badge">Live Rank Enabled</span>
+      Audit report PDF includes Google live rank positions (SerpAPI) for top keywords.
+    </p>
   </header>
 
   @if (message) {
@@ -88,6 +92,11 @@
             </td>
             <td>
               <a class="pdf-link" [href]="pdfUrl(s.id)" target="_blank" rel="noopener">Download</a>
+              @if (s.status === 'completed') {
+                <div class="pdf-meta">
+                  <span class="live-rank-badge">Live Rank</span>
+                </div>
+              }
             </td>
             <td>
               <button type="button" (click)="sendReport(s)" [disabled]="busyId === s.id">

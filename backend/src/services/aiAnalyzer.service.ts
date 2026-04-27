@@ -733,7 +733,18 @@ export async function analyzePagesWithAiWithSignals(
       keywordInsights: computeFreeKeywordInsights(p, seoScore, issueTypes),
       backlinkInsights,
       performanceMetrics: perf
-        ? { source: 'pagespeed', lcpMs: perf.lcpMs, cls: perf.cls, inpMs: perf.inpMs, ttfbMs: perf.ttfbMs }
+        ? {
+            source: 'pagespeed',
+            lcpMs: perf.lcpMs,
+            fcpMs: perf.fcpMs,
+            cls: perf.cls,
+            inpMs: perf.inpMs,
+            ttfbMs: perf.ttfbMs,
+            lighthousePerformanceScore: perf.lighthousePerformanceScore,
+            lighthouseSeoScore: perf.lighthouseSeoScore,
+            lighthouseAccessibilityScore: perf.lighthouseAccessibilityScore,
+            lighthouseBestPracticesScore: perf.lighthouseBestPracticesScore,
+          }
         : { source: 'crawl_estimate', lcpMs: p.loadTimeMs },
       issues,
       suggestedTitle: titleSuggestion(p, isDuplicateTitle),

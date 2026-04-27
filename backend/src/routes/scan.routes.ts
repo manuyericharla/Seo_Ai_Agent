@@ -9,6 +9,9 @@ import {
   getActivity,
   getSettings,
   putSettings,
+  postGooglePageSpeedTest,
+  postSerpApiTest,
+  postSerpLiveRank,
   postIssueGithub,
   postIssuePullRequest,
   postScanClaudePr,
@@ -20,6 +23,8 @@ import {
   getLatestKeywordOpportunities,
   getBacklinkAnalytics,
   getLatestBacklinkAnalytics,
+  getImageAltRouteMap,
+  getLatestImageAltRouteMap,
   postStopScan,
 } from '../controllers/scan.controller';
 
@@ -46,11 +51,15 @@ scanRouter.post('/scan/:scanId/stop', postStopScan);
 scanRouter.get('/reports/:scanId/pdf', (req, res) => {
   void getScanReportPdf(req, res);
 });
-scanRouter.get('/reports/:scanId/json', getPageReportsJson);
+scanRouter.get('/reports/:scanId/json', (req, res) => {
+  void getPageReportsJson(req, res);
+});
 scanRouter.get('/reports/:scanId/keyword-opportunities', getKeywordOpportunities);
 scanRouter.get('/reports/latest/keyword-opportunities', getLatestKeywordOpportunities);
 scanRouter.get('/reports/:scanId/backlink-analytics', getBacklinkAnalytics);
 scanRouter.get('/reports/latest/backlink-analytics', getLatestBacklinkAnalytics);
+scanRouter.get('/reports/:scanId/image-alt-route-map', getImageAltRouteMap);
+scanRouter.get('/reports/latest/image-alt-route-map', getLatestImageAltRouteMap);
 scanRouter.get('/reports', getReports);
 scanRouter.post('/send-report', (req, res) => {
   void postSendReport(req, res);
@@ -61,6 +70,15 @@ scanRouter.get('/dashboard-stats', getDashboardStats);
 scanRouter.get('/activity', getActivity);
 scanRouter.get('/settings', getSettings);
 scanRouter.put('/settings', putSettings);
+scanRouter.post('/settings/google-pagespeed/test', (req, res) => {
+  void postGooglePageSpeedTest(req, res);
+});
+scanRouter.post('/settings/serpapi/test', (req, res) => {
+  void postSerpApiTest(req, res);
+});
+scanRouter.post('/serp/live-rank', (req, res) => {
+  void postSerpLiveRank(req, res);
+});
 scanRouter.post('/issues/:id/github', (req, res) => {
   void postIssueGithub(req, res);
 });

@@ -149,6 +149,60 @@ function extractInvalidNavLinks(html: string): { href: string; reason: string; c
   return rows;
 }
 
+function titleCaseWords(input: string): string {
+  return input
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function suggestImageAlt(src: string, pageTitle: string, primaryHeading: string): string {
+  const baseText = primaryHeading || pageTitle || 'Page image';
+  let fileHint = '';
+  try {
+    const u = new URL(src);
+    const part = (u.pathname.split('/').pop() || '').replace(/\.[a-z0-9]{2,6}$/i, '');
+    fileHint = part.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  } catch {
+    fileHint = src.replace(/\?.*$/, '').split('/').pop()?.replace(/\.[a-z0-9]{2,6}$/i, '') || '';
+    fileHint = fileHint.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  if (fileHint) return titleCaseWords(fileHint).slice(0, 120);
+  return titleCaseWords(baseText).slice(0, 120);
+}
+
+function extractImageData(
+  html: string,
+  baseOrigin: string,
+  pageTitle: string,
+  primaryHeading: string
+): { src: string; alt: string; suggestedAlt?: string }[] {
+  const images: { src: string; alt: string; suggestedAlt?: string }[] = [];
+  const seen = new Set<string>();
+  for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = match[0] ?? '';
+    const rawSrc = extractAttr(tag, 'src');
+    if (!rawSrc) continue;
+    let absSrc = rawSrc;
+    try {
+      absSrc = new URL(rawSrc, baseOrigin).toString();
+    } catch {
+      // Keep raw src if URL normalization fails.
+    }
+    if (seen.has(absSrc)) continue;
+    seen.add(absSrc);
+    const alt = extractAttr(tag, 'alt');
+    images.push({
+      src: absSrc,
+      alt,
+      suggestedAlt: alt.trim() ? undefined : suggestImageAlt(absSrc, pageTitle, primaryHeading),
+    });
+  }
+  return images;
+}
+
 async function checkLink(href: string, baseOrigin: string, timeoutMs: number): Promise<boolean> {
   try {
     const u = new URL(href, baseOrigin);
@@ -268,6 +322,7 @@ export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal
           imagesWithoutAlt: 0,
           brokenLinks: [url],
           invalidNavLinks: [],
+          images: [],
           loadTimeMs,
           contentSnippet: '',
         });
@@ -289,11 +344,8 @@ export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal
       const text = stripTags(html);
       const wordCount = text ? text.split(/\s+/).filter(Boolean).length : 0;
       const contentSnippet = text.slice(0, 750);
-      const imagesWithoutAlt = [...html.matchAll(/<img\b[^>]*>/gi)].reduce((n, m) => {
-        const tag = m[0] ?? '';
-        const alt = extractAttr(tag, 'alt');
-        return n + (alt.trim() ? 0 : 1);
-      }, 0);
+      const images = extractImageData(html, baseOrigin, title, headings[0] || '');
+      const imagesWithoutAlt = images.reduce((n, img) => n + (img.alt.trim() ? 0 : 1), 0);
       const invalidNavLinks = extractInvalidNavLinks(html);
 
       for (const link of links) {
@@ -319,6 +371,7 @@ export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal
         imagesWithoutAlt,
         brokenLinks: [],
         invalidNavLinks,
+        images: images.slice(0, 120),
         loadTimeMs,
         contentSnippet,
       });
@@ -338,6 +391,7 @@ export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal
         imagesWithoutAlt: 0,
         brokenLinks: [url],
         invalidNavLinks: [],
+        images: [],
         loadTimeMs,
         contentSnippet: '',
       });

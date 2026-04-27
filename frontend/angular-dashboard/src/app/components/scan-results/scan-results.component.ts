@@ -230,4 +230,5 @@ export class ScanResultsComponent implements OnInit, OnDestroy {
       },
     });
   }
+
 }

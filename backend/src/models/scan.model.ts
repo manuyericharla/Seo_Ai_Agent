@@ -12,6 +12,11 @@ export interface CrawlPageResult {
   brokenLinks: string[];
   /** Footer / social-style links with #, empty, javascript:, or missing href (broken “click”). */
   invalidNavLinks: { href: string; reason: string; context: string }[];
+  images?: {
+    src: string;
+    alt: string;
+    suggestedAlt?: string;
+  }[];
   loadTimeMs: number;
   contentSnippet?: string;
 }
@@ -69,9 +74,14 @@ export interface SeoPageReport {
   performanceMetrics?: {
     source: 'pagespeed' | 'crawl_estimate';
     lcpMs?: number;
+    fcpMs?: number;
     cls?: number;
     inpMs?: number;
     ttfbMs?: number;
+    lighthousePerformanceScore?: number;
+    lighthouseSeoScore?: number;
+    lighthouseAccessibilityScore?: number;
+    lighthouseBestPracticesScore?: number;
   };
   issues: AiIssueItem[];
   suggestedTitle: string;

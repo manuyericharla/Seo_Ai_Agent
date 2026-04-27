@@ -22,6 +22,46 @@
         <input [id]="f.key" [name]="f.key" [type]="f.type" [(ngModel)]="form[f.key]" autocomplete="off" />
       </div>
     }
+
+    <div class="toggle-row">
+      <label for="live-serp-rank-toggle">Enable live Google rank in audit reports</label>
+      <input
+        id="live-serp-rank-toggle"
+        name="live-serp-rank-toggle"
+        type="checkbox"
+        [(ngModel)]="liveSerpRankEnabled"
+      />
+    </div>
+    <p class="muted">Keep OFF for free mode. Turn ON only when you want live Google rank via SerpAPI.</p>
+
     <button type="submit">Save settings</button>
   </form>
+
+  <section class="panel" style="margin-top: 12px;">
+    <h3>Google PageSpeed API test</h3>
+    <div class="field">
+      <label for="google-test-url">Test URL</label>
+      <input
+        id="google-test-url"
+        name="google-test-url"
+        type="text"
+        [(ngModel)]="googleTestUrl"
+        [ngModelOptions]="{ standalone: true }"
+        autocomplete="off"
+      />
+    </div>
+    <button type="button" (click)="testGooglePageSpeed()" [disabled]="googleTestRunning">
+      {{ googleTestRunning ? 'Testing...' : 'Test Google connection' }}
+    </button>
+    @if (googleTestResult) {
+      <div class="test-result" style="margin-top: 8px;">
+        @if (googleTestStatus) {
+          <span class="quality" [ngClass]="googleTestStatus">
+            {{ googleTestStatus === 'good' ? 'Good' : googleTestStatus === 'needs' ? 'Needs Improvement' : 'Poor' }}
+          </span>
+        }
+        <p class="muted">{{ googleTestResult }}</p>
+      </div>
+    }
+  </section>
 </div>

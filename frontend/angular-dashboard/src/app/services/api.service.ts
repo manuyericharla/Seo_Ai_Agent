@@ -135,6 +135,67 @@ export class ApiService {
     return this.http.put<{ ok: boolean }>(`${this.base}/settings`, body);
   }
 
+  testGooglePageSpeed(url?: string): Observable<{
+    ok: boolean;
+    message?: string;
+    error?: string;
+    url?: string;
+    metrics?: Record<string, number | undefined>;
+  }> {
+    return this.http.post<{
+      ok: boolean;
+      message?: string;
+      error?: string;
+      url?: string;
+      metrics?: Record<string, number | undefined>;
+    }>(`${this.base}/settings/google-pagespeed/test`, {
+      url,
+    });
+  }
+
+  testSerpApi(keyword?: string): Observable<{ ok: boolean; message?: string; error?: string; organicCount?: number }> {
+    return this.http.post<{ ok: boolean; message?: string; error?: string; organicCount?: number }>(
+      `${this.base}/settings/serpapi/test`,
+      { keyword }
+    );
+  }
+
+  getLiveRank(body: {
+    keyword: string;
+    targetDomain: string;
+    location?: string;
+    device?: 'desktop' | 'mobile';
+    num?: number;
+  }): Observable<{
+    ok: boolean;
+    error?: string;
+    data?: {
+      keyword: string;
+      targetDomain: string;
+      location: string;
+      device: 'desktop' | 'mobile';
+      found: boolean;
+      position: number | null;
+      matchedUrl: string | null;
+      topResults: Array<{ position: number; title: string; link: string; snippet: string }>;
+    };
+  }> {
+    return this.http.post<{
+      ok: boolean;
+      error?: string;
+      data?: {
+        keyword: string;
+        targetDomain: string;
+        location: string;
+        device: 'desktop' | 'mobile';
+        found: boolean;
+        position: number | null;
+        matchedUrl: string | null;
+        topResults: Array<{ position: number; title: string; link: string; snippet: string }>;
+      };
+    }>(`${this.base}/serp/live-rank`, body);
+  }
+
   postIssueGithub(issueId: number): Observable<{ ok: boolean; url?: string; error?: string }> {
     return this.http.post<{ ok: boolean; url?: string; error?: string }>(`${this.base}/issues/${issueId}/github`, {});
   }

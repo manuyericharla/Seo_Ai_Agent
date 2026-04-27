@@ -2,6 +2,16 @@ import PDFDocument from 'pdfkit';
 import { PassThrough } from 'stream';
 import type { SeoPageReport } from '../models/scan.model';
 
+export interface SerpRankRow {
+  pageUrl: string;
+  keyword: string;
+  found: boolean;
+  position: number | null;
+  matchedUrl: string | null;
+  location: string;
+  device: 'desktop' | 'mobile';
+}
+
 export interface ScanPdfMeta {
   id: number;
   domain: string;
@@ -116,7 +126,8 @@ function keywordQuickAction(rep: SeoPageReport): string {
 /** Professional per-page audit (preferred). */
 export function buildScanReportPdfFromPageReports(
   meta: ScanPdfMeta,
-  pageReports: Record<string, SeoPageReport>
+  pageReports: Record<string, SeoPageReport>,
+  serpRows: SerpRankRow[] = []
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36, info: { Title: `SEO Report — ${meta.domain}` } });
@@ -415,7 +426,75 @@ export function buildScanReportPdfFromPageReports(
       { fontSize: 7, rowPadding: 2 }
     );
 
-    sectionTitle('5. Top Keyword Opportunities (Free Algorithm)');
+    const avgOnPageScore = pages.length
+      ? Math.round(pages.reduce((s, p) => s + (p.scoreBreakdown?.onPage ?? p.seoScore), 0) / pages.length)
+      : 0;
+    const avgTechnicalScore = pages.length
+      ? Math.round(pages.reduce((s, p) => s + (p.scoreBreakdown?.technical ?? 0), 0) / pages.length)
+      : 0;
+    const onPageIssueCount = pages.reduce(
+      (n, p) =>
+        n +
+        p.issues.filter((i) =>
+          [
+            'missing_title',
+            'missing_meta_description',
+            'missing_h1',
+            'multiple_h1',
+            'duplicate_title',
+            'low_word_count',
+            'images_without_alt',
+            'missing_canonical',
+          ].includes(i.type)
+        ).length,
+      0
+    );
+    const avgOffPageScore = pages.length
+      ? Math.round(
+          pages.reduce((s, p) => s + (p.backlinkInsights?.backlinkQualityScore ?? p.scoreBreakdown?.backlinks ?? 0), 0) /
+            pages.length
+        )
+      : 0;
+    const totalInternalReferrals = pages.reduce((n, p) => n + (p.backlinkInsights?.internalReferringPages ?? 0), 0);
+    const totalExternalDomains = pages.reduce((n, p) => n + (p.backlinkInsights?.uniqueExternalDomainsLinked ?? 0), 0);
+
+    sectionTitle('5. On-page SEO Analysis');
+    drawTable(
+      [
+        { key: 'metric', title: 'Metric', width: 260 },
+        { key: 'value', title: 'Value', width: 440 },
+      ],
+      [
+        { metric: 'Average On-page Score', value: avgOnPageScore },
+        { metric: 'Average Technical Score', value: avgTechnicalScore },
+        { metric: 'On-page Issue Count', value: onPageIssueCount },
+        {
+          metric: 'Priority',
+          value: 'Fix title/meta/H1/content depth/canonical/image ALT issues first for faster ranking impact.',
+        },
+      ],
+      { fontSize: 9 }
+    );
+
+    sectionTitle('6. Off-page SEO Analysis (Free-mode)');
+    drawTable(
+      [
+        { key: 'metric', title: 'Metric', width: 260 },
+        { key: 'value', title: 'Value', width: 440 },
+      ],
+      [
+        { metric: 'Average Off-page Score', value: avgOffPageScore },
+        { metric: 'Internal Referring Links', value: totalInternalReferrals },
+        { metric: 'Unique External Domains Linked', value: totalExternalDomains },
+        {
+          metric: 'Note',
+          value: 'This is free-mode off-page insight from crawl graph signals; not full web backlink intelligence.',
+        },
+      ],
+      { fontSize: 9 }
+    );
+
+    sectionTitle('7. Top Keyword Opportunities (Free Algorithm)');
     const opportunityRows = pages
       .map((rep) => ({
         url: displayUrl(rep.url),
@@ -442,7 +521,40 @@ export function buildScanReportPdfFromPageReports(
       { fontSize: 8, rowPadding: 3 }
     );
 
-    sectionTitle('6. AI Content Improvements');
+    sectionTitle('8. Live Google Rank Positions (SerpAPI)');
+    if (serpRows.length === 0) {
+      drawTable(
+        [
+          { key: 'metric', title: 'Metric', width: 260 },
+          { key: 'value', title: 'Value', width: 440 },
+        ],
+        [
+          { metric: 'Status', value: 'Live SERP rank data unavailable for this report.' },
+          { metric: 'Reason', value: 'SERPAPI_KEY missing, API limit reached, or no keywords were eligible.' },
+        ],
+        { fontSize: 9 }
+      );
+    } else {
+      drawTable(
+        [
+          { key: 'page', title: 'Page URL', width: 230 },
+          { key: 'keyword', title: 'Keyword', width: 180 },
+          { key: 'position', title: 'Google Position', width: 100, align: 'center' },
+          { key: 'found', title: 'Found', width: 70, align: 'center' },
+          { key: 'location', title: 'Location/Device', width: 120 },
+        ],
+        serpRows.slice(0, 12).map((r) => ({
+          page: displayUrl(r.pageUrl),
+          keyword: r.keyword.slice(0, 90),
+          position: r.position ?? '>100',
+          found: r.found ? 'Yes' : 'No',
+          location: `${r.location}/${r.device}`,
+        })),
+        { fontSize: 8, rowPadding: 3 }
+      );
+    }
+
+    sectionTitle('9. AI Content Improvements');
     drawTable(
       [
         { key: 'page', title: 'Page', width: 210 },
@@ -461,7 +573,7 @@ export function buildScanReportPdfFromPageReports(
       { fontSize: 7, rowPadding: 2 }
     );
 
-    sectionTitle('7. Technical SEO Recommendations');
+    sectionTitle('10. Technical SEO Recommendations');
     drawTable(
       [
         { key: 'area', title: 'Area', width: 240 },
@@ -476,7 +588,7 @@ export function buildScanReportPdfFromPageReports(
       ]
     );
 
-    sectionTitle('8. Priority Action Plan');
+    sectionTitle('11. Priority Action Plan');
     drawTable(
       [
         { key: 'priority', title: 'Priority', width: 120, align: 'center' },
@@ -491,7 +603,7 @@ export function buildScanReportPdfFromPageReports(
       ]
     );
 
-    sectionTitle('9. Overall SEO Opportunity Summary');
+    sectionTitle('12. Overall SEO Opportunity Summary');
     const currentContent = pages.length ? Math.round(pages.reduce((s, p) => s + (p.scoreBreakdown?.content ?? 50), 0) / pages.length) : 0;
     const currentTechnical = pages.length ? Math.round(pages.reduce((s, p) => s + (p.scoreBreakdown?.technical ?? 50), 0) / pages.length) : 0;
     const currentRanking = pages.length ? Math.round(pages.reduce((s, p) => s + (p.keywordInsights?.rankingProbability ?? 35), 0) / pages.length) : 0;

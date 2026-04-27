@@ -17,9 +17,16 @@ export class SettingsComponent implements OnInit {
   form: Record<string, string> = {};
   message: string | null = null;
   error: string | null = null;
+  googleTestUrl = 'https://example.com';
+  googleTestResult: string | null = null;
+  googleTestStatus: 'good' | 'needs' | 'poor' | null = null;
+  googleTestRunning = false;
+  liveSerpRankEnabled = false;
 
   readonly fields = [
     { key: 'OPENAI_API_KEY', label: 'OpenAI API key', type: 'password' },
+    { key: 'GOOGLE_API_KEY', label: 'Google API key (PageSpeed)', type: 'password' },
+    { key: 'SERPAPI_KEY', label: 'SerpAPI key (live rank)', type: 'password' },
     { key: 'GITHUB_TOKEN', label: 'GitHub token', type: 'password' },
     { key: 'GITHUB_REPO_OWNER', label: 'GitHub repository owner', type: 'text' },
     { key: 'GITHUB_REPO_NAME', label: 'GitHub repository name', type: 'text' },
@@ -44,6 +51,9 @@ export class SettingsComponent implements OnInit {
     this.api.getSettings().subscribe({
       next: (s) => {
         this.form = { ...s };
+        this.liveSerpRankEnabled = String(this.form['ENABLE_LIVE_SERP_RANK'] || '')
+          .toLowerCase()
+          .trim() === 'true';
       },
       error: (e) => (this.error = httpErrorMessage(e)),
     });
@@ -52,12 +62,45 @@ export class SettingsComponent implements OnInit {
   save(): void {
     this.message = null;
     this.error = null;
+    this.form['ENABLE_LIVE_SERP_RANK'] = this.liveSerpRankEnabled ? 'true' : 'false';
     this.api.putSettings(this.form).subscribe({
       next: () => {
         this.message = 'Settings saved on the server (use environment variables in production).';
         this.load();
       },
       error: (e) => (this.error = httpErrorMessage(e)),
+    });
+  }
+
+  testGooglePageSpeed(): void {
+    this.googleTestResult = null;
+    this.googleTestStatus = null;
+    this.error = null;
+    this.googleTestRunning = true;
+    this.api.testGooglePageSpeed(this.googleTestUrl).subscribe({
+      next: (r) => {
+        this.googleTestRunning = false;
+        if (!r.ok) {
+          this.googleTestStatus = 'poor';
+          this.googleTestResult = r.error || 'Google PageSpeed test failed.';
+          return;
+        }
+        const m = r.metrics || {};
+        const perf = Number(m['lighthousePerformanceScore'] ?? 0);
+        this.googleTestStatus = perf >= 90 ? 'good' : perf >= 50 ? 'needs' : 'poor';
+        this.googleTestResult =
+          `OK - ${r.url || this.googleTestUrl} | ` +
+          `LCP: ${m['lcpMs'] ?? 'n/a'} ms, ` +
+          `FCP: ${m['fcpMs'] ?? 'n/a'} ms, ` +
+          `INP: ${m['inpMs'] ?? 'n/a'} ms, ` +
+          `CLS: ${m['cls'] ?? 'n/a'}, ` +
+          `Perf score: ${m['lighthousePerformanceScore'] ?? 'n/a'}`;
+      },
+      error: (e) => {
+        this.googleTestRunning = false;
+        this.googleTestStatus = 'poor';
+        this.googleTestResult = httpErrorMessage(e);
+      },
     });
   }
 }

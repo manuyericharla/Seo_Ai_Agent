@@ -1,11 +1,17 @@
 import { config } from '../config/config';
+import { getSetting } from './db.service';
 import { logger } from '../utils/logger';
 
 export interface PageSpeedMetrics {
   lcpMs?: number;
+  fcpMs?: number;
   cls?: number;
   inpMs?: number;
   ttfbMs?: number;
+  lighthousePerformanceScore?: number;
+  lighthouseSeoScore?: number;
+  lighthouseAccessibilityScore?: number;
+  lighthouseBestPracticesScore?: number;
 }
 
 function timeoutSignal(timeoutMs: number): AbortSignal {
@@ -23,14 +29,16 @@ function readNumeric(obj: unknown, path: string[]): number | undefined {
 
 export async function fetchPageSpeedMetrics(url: string): Promise<PageSpeedMetrics | null> {
   try {
+    const configuredApiKey = getSetting('GOOGLE_API_KEY') || getSetting('GoogleAPIKey') || config.googleApiKey;
     const apiBase = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(
       url
-    )}&strategy=${encodeURIComponent(config.pageSpeedStrategy)}&category=PERFORMANCE`;
-    const api = config.googleApiKey ? `${apiBase}&key=${encodeURIComponent(config.googleApiKey)}` : apiBase;
+    )}&strategy=${encodeURIComponent(config.pageSpeedStrategy)}&category=PERFORMANCE&category=SEO&category=ACCESSIBILITY&category=BEST_PRACTICES`;
+    const api = configuredApiKey ? `${apiBase}&key=${encodeURIComponent(configuredApiKey)}` : apiBase;
     const resp = await fetch(api, { method: 'GET', signal: timeoutSignal(config.pageSpeedTimeoutMs) });
     if (!resp.ok) return null;
     const json = await resp.json();
     const audits = (json as any)?.lighthouseResult?.audits;
+    const categories = (json as any)?.lighthouseResult?.categories || {};
     const loadingExp = (json as any)?.loadingExperience?.metrics || {};
     const originExp = (json as any)?.originLoadingExperience?.metrics || {};
 
@@ -49,9 +57,27 @@ export async function fetchPageSpeedMetrics(url: string): Promise<PageSpeedMetri
       readNumeric(originExp, ['INTERACTION_TO_NEXT_PAINT', 'percentile']) ||
       readNumeric(audits, ['interaction-to-next-paint', 'numericValue']);
 
+    const fcpMs = readNumeric(audits, ['first-contentful-paint', 'numericValue']);
     const ttfbMs = readNumeric(audits, ['server-response-time', 'numericValue']);
+    const lighthousePerformanceScore = readNumeric(categories, ['performance', 'score']);
+    const lighthouseSeoScore = readNumeric(categories, ['seo', 'score']);
+    const lighthouseAccessibilityScore = readNumeric(categories, ['accessibility', 'score']);
+    const lighthouseBestPracticesScore = readNumeric(categories, ['best-practices', 'score']);
 
-    return { lcpMs, cls, inpMs, ttfbMs };
+    return {
+      lcpMs,
+      fcpMs,
+      cls,
+      inpMs,
+      ttfbMs,
+      lighthousePerformanceScore:
+        lighthousePerformanceScore == null ? undefined : Math.round(lighthousePerformanceScore * 100),
+      lighthouseSeoScore: lighthouseSeoScore == null ? undefined : Math.round(lighthouseSeoScore * 100),
+      lighthouseAccessibilityScore:
+        lighthouseAccessibilityScore == null ? undefined : Math.round(lighthouseAccessibilityScore * 100),
+      lighthouseBestPracticesScore:
+        lighthouseBestPracticesScore == null ? undefined : Math.round(lighthouseBestPracticesScore * 100),
+    };
   } catch (e) {
     logger.warn('pagespeed fetch failed', { url, error: String(e) });
     return null;
