@@ -1,207 +1,142 @@
-name: Build & Deploy SEO Agent 
- 
+name: Build & Deploy SEO Agent
+
 on:
-
   workflow_dispatch:
-
   push:
-
     branches:
-
       - DEV
-
       - QA
-
       - DEMO24
-
       - main
- 
+
 concurrency:
-
   group: ec2-${{ github.ref_name }}
-
   cancel-in-progress: false
- 
+
 jobs:
-
   deploy:
-
     name: Deploy - ${{ github.ref_name }}
- 
+
     concurrency:
-
       group: repo-${{ github.repository }}-${{ github.ref_name }}
-
       cancel-in-progress: false
- 
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.ACCESSKEYID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SECRETKEY }}
+      AWS_DEFAULT_REGION: us-east-2
+
     runs-on:
-
       - self-hosted
-
       - ${{ 
-
           github.ref_name == 'DEV' && 'dev' ||
-
           github.ref_name == 'QA' && 'qa' ||
-
           github.ref_name == 'DEMO24' && 'uat' ||
-
           'prod'
-
         }}
- 
+
     steps:
- 
-      # ------------------------------------------------------------
 
+      # ------------------------------------------------------------
       # Checkout
-
       # ------------------------------------------------------------
-
       - name: Checkout
-
         uses: actions/checkout@v3
-
         with:
-
           fetch-depth: 0
- 
-      # ------------------------------------------------------------
 
+      # ------------------------------------------------------------
       # Resolve Environment
-
       # ------------------------------------------------------------
-
       - name: Resolve Environment
-
         run: |
-
           case "${{ github.ref_name }}" in
-
             DEV)
-
               echo "ENV=DEV" >> $GITHUB_ENV
-
               echo "CONFIG_URL=${{ secrets.CONFIG_SERVER_DEV }}" >> $GITHUB_ENV
-
+              echo "PORT=8011" >> $GITHUB_ENV
               ;;
-
             QA)
-
               echo "ENV=QA" >> $GITHUB_ENV
-
               echo "CONFIG_URL=${{ secrets.CONFIG_SERVER_QA }}" >> $GITHUB_ENV
-
+              echo "PORT=8012" >> $GITHUB_ENV
               ;;
-
             DEMO24)
-
               echo "ENV=DEMO" >> $GITHUB_ENV
-
               echo "CONFIG_URL=${{ secrets.CONFIG_SERVER_DEMO }}" >> $GITHUB_ENV
-
+              echo "PORT=8013" >> $GITHUB_ENV
               ;;
-
             main)
-
               echo "ENV=PROD" >> $GITHUB_ENV
-
               echo "CONFIG_URL=${{ secrets.CONFIG_SERVER_PROD }}" >> $GITHUB_ENV
-
+              echo "PORT=8014" >> $GITHUB_ENV
               ;;
-
           esac
- 
           echo "GIT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
-
           echo "IMAGE_NAME=$(basename "$GITHUB_REPOSITORY")" >> $GITHUB_ENV
- 
-      # ------------------------------------------------------------
-
-      # AWS Credentials
 
       # ------------------------------------------------------------
-
-      - name: Configure AWS
-
+      # Verify Secrets (safe - shows length only)
+      # ------------------------------------------------------------
+      - name: Verify AWS Credentials
         run: |
+          echo "Access Key length: ${#AWS_ACCESS_KEY_ID}"
+          echo "Secret Key length: ${#AWS_SECRET_ACCESS_KEY}"
+          aws sts get-caller-identity
 
-          aws configure set aws_access_key_id ${{ secrets.ACCESSKEYID }}
-
-          aws configure set aws_secret_access_key ${{ secrets.SECRETKEY }}
-          echo "Access Key:"${{ secrets.ACCESSKEYID}}
-          echo "Access Key:"${{ secrets.SECRETKEY}}
- 
       # ------------------------------------------------------------
-
       # Build & Deploy
-
       # ------------------------------------------------------------
-
       - name: Build & Deploy Container
-
+        shell: bash
         run: |
+          set -e
 
           IMAGE_TAG="${IMAGE_NAME}:${ENV}-${GIT_SHA}"
+          CONTAINER_NAME="seo-agent-${ENV}"
 
-          CONTAINER_NAME="SEOAgent"
- 
-          echo "Container: $CONTAINER_NAME"
+          echo "====================================="
+          echo "Container : $CONTAINER_NAME"
+          echo "Image     : $IMAGE_TAG"
+          echo "Port      : $PORT"
+          echo "Env       : $ENV"
+          echo "====================================="
 
-          echo "Image: $IMAGE_TAG"
-
-          echo "Using Port: 8011"
- 
           echo "Building image..."
-
           docker build --no-cache -t "$IMAGE_TAG" .
- 
+
           echo "Stopping existing container..."
-
           docker stop "$CONTAINER_NAME" 2>/dev/null || true
-
           docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
- 
+
           echo "Creating volume..."
+          docker volume create "hiperbrains-${ENV}-data" || true
 
-          docker volume create hiperbrains-${ENV}-data || true
- 
           echo "Creating .env file..."
-          {
-            echo "NODE_ENV=production"
-            echo "PORT=8080"
-            echo "DB_PATH=/app/data/app.db"
-          } > .env
- 
+          cat > .env <<EOF
+          NODE_ENV=production
+          PORT=8080
+          DB_PATH=/app/data/app.db
+          EOF
+
           echo "Starting new container..."
-
           docker run -d \
-
             --name "$CONTAINER_NAME" \
-
-            -p 8011:8080 \
-
+            -p "${PORT}:8080" \
             --env-file .env \
-
             -e ConfigUrl="$CONFIG_URL" \
-
-            -v hiperbrains-${ENV}-data:/app/data \
-
+            -v "hiperbrains-${ENV}-data:/app/data" \
             --restart unless-stopped \
-
             --log-driver=awslogs \
-
             --log-opt awslogs-region=us-east-2 \
-
             --log-opt awslogs-group=hiperbrains-api \
-
             --log-opt awslogs-create-group=true \
-
             --log-opt awslogs-stream="$CONTAINER_NAME" \
-
             "$IMAGE_TAG"
- 
-          echo "Cleaning unused images..."
 
+          echo "Cleaning unused images..."
           docker image prune -f
- 
+
+          echo "====================================="
+          echo "Deploy complete: $CONTAINER_NAME on port $PORT"
+          echo "====================================="
