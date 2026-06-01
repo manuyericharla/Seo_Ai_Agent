@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { config } from '../config/config';
-import { getDb } from './db.service';
+import { getDb, isMultiTenantEnabled } from './db.service';
 import { deleteScanReportFile } from './reportFile.service';
 import { logger } from '../utils/logger';
 
@@ -62,6 +62,10 @@ export function startDataRetentionScheduler(): void {
   const days = config.dataRetentionDays;
   if (days <= 0) {
     logger.info('Data retention disabled (DATA_RETENTION_DAYS=0)');
+    return;
+  }
+  if (isMultiTenantEnabled()) {
+    logger.info('Data retention purge skipped in PostgreSQL mode (SQLite-only helper)');
     return;
   }
 

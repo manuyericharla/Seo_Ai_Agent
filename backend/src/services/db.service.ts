@@ -37,6 +37,9 @@ export async function initDb(): Promise<void> {
           connectionTimeoutMillis: 15_000,
           idleTimeoutMillis: 30_000,
         });
+        pgPool.on('error', (err) => {
+          logger.error('PostgreSQL pool error', { error: String(err) });
+        });
         await migratePostgres();
         logger.info('Database: PostgreSQL (multi-tenant)');
         return;

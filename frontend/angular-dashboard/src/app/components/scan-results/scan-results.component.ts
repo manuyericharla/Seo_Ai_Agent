@@ -25,7 +25,7 @@ export class ScanResultsComponent implements OnInit, OnDestroy {
   claudePrBusyId: number | null = null;
   emailPrBusyId: number | null = null;
   deletingScanId: number | null = null;
-  pdfDownloadingId: number | null = null;
+  reportDownloading: { scanId: number; format: 'pdf' | 'json' | 'md' } | null = null;
   showPrByScanId: Record<number, boolean> = {};
   message: string | null = null;
   error: string | null = null;
@@ -113,32 +113,47 @@ export class ScanResultsComponent implements OnInit, OnDestroy {
     if (this.currentPage < 1) this.currentPage = 1;
   }
 
-  downloadPdf(scan: ScanRow): void {
-    if (this.pdfDownloadingId != null) return;
-    this.pdfDownloadingId = scan.id;
+  isReportDownloading(scanId: number, format: 'pdf' | 'json' | 'md'): boolean {
+    return this.reportDownloading?.scanId === scanId && this.reportDownloading.format === format;
+  }
+
+  downloadReport(scan: ScanRow, format: 'pdf' | 'json' | 'md'): void {
+    if (this.reportDownloading != null) return;
+    this.reportDownloading = { scanId: scan.id, format };
     this.error = null;
-    this.api.downloadReportPdf(scan.id).subscribe({
+    const request =
+      format === 'pdf'
+        ? this.api.downloadReportPdf(scan.id)
+        : format === 'json'
+          ? this.api.downloadReportJson(scan.id)
+          : this.api.downloadReportMarkdown(scan.id);
+    const ext = format === 'pdf' ? 'pdf' : format === 'json' ? 'json' : 'md';
+    request.subscribe({
       next: (blob) => {
-        this.pdfDownloadingId = null;
+        this.reportDownloading = null;
         const safeDomain = scan.domain.replace(/[^\w.-]+/g, '-');
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `seo-report-${safeDomain}-${scan.id}.pdf`;
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+        this.saveBlobDownload(blob, `seo-report-${safeDomain}-${scan.id}.${ext}`);
       },
       error: (e) => {
-        this.pdfDownloadingId = null;
-        void this.pdfDownloadErrorMessage(e).then((msg) => (this.error = msg));
+        this.reportDownloading = null;
+        void this.reportDownloadErrorMessage(e).then((msg) => (this.error = msg));
       },
     });
   }
 
-  private async pdfDownloadErrorMessage(err: unknown): Promise<string> {
+  private saveBlobDownload(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  private async reportDownloadErrorMessage(err: unknown): Promise<string> {
     if (err instanceof HttpErrorResponse && err.error instanceof Blob) {
       try {
         const text = await err.error.text();

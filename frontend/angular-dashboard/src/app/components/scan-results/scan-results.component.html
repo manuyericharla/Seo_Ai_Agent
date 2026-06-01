@@ -4,7 +4,7 @@
     <p class="muted">Recent scans with pages, SEO score, email, and GitHub automation status. Off-page reporting uses free crawl-based signals.</p>
     <p class="muted">
       <span class="live-rank-badge">Live Rank Enabled</span>
-      Audit report PDF includes Google live rank positions (SerpAPI) for top keywords.
+      Audit reports (PDF, JSON, MD) include Google live rank positions (SerpAPI) for top keywords when enabled.
     </p>
   </header>
 
@@ -53,7 +53,7 @@
           <th>Email</th>
           <th>GH issues</th>
           <th>Claude PR</th>
-          <th>PDF</th>
+          <th>Report</th>
           <th></th>
         </tr>
       </thead>
@@ -104,14 +104,32 @@
               }
             </td>
             <td>
-              <button
-                type="button"
-                class="pdf-link"
-                (click)="downloadPdf(s)"
-                [disabled]="pdfDownloadingId === s.id"
-              >
-                {{ pdfDownloadingId === s.id ? 'Downloading…' : 'Download' }}
-              </button>
+              <div class="report-downloads">
+                <button
+                  type="button"
+                  class="pdf-link"
+                  (click)="downloadReport(s, 'pdf')"
+                  [disabled]="isReportDownloading(s.id, 'pdf')"
+                >
+                  {{ isReportDownloading(s.id, 'pdf') ? 'PDF…' : 'PDF' }}
+                </button>
+                <button
+                  type="button"
+                  class="pdf-link"
+                  (click)="downloadReport(s, 'json')"
+                  [disabled]="isReportDownloading(s.id, 'json')"
+                >
+                  {{ isReportDownloading(s.id, 'json') ? 'JSON…' : 'JSON' }}
+                </button>
+                <button
+                  type="button"
+                  class="pdf-link"
+                  (click)="downloadReport(s, 'md')"
+                  [disabled]="isReportDownloading(s.id, 'md')"
+                >
+                  {{ isReportDownloading(s.id, 'md') ? 'MD…' : 'MD' }}
+                </button>
+              </div>
               @if (s.status === 'completed') {
                 <div class="pdf-meta">
                   <span class="live-rank-badge">Live Rank</span>

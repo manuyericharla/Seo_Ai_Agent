@@ -180,6 +180,12 @@ select {
   color: var(--muted);
 }
 
+.report-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+}
+
 .pdf-meta {
   margin-top: 0.3rem;
 }

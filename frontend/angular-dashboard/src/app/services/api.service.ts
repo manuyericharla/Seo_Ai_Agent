@@ -134,9 +134,17 @@ export class ApiService {
     });
   }
 
-  /** Authenticated PDF download (Bearer token via auth interceptor). */
+  /** Authenticated report downloads (Bearer token via auth interceptor). */
   downloadReportPdf(scanId: number): Observable<Blob> {
     return this.http.get(`${this.base}/reports/${scanId}/pdf`, { responseType: 'blob' });
+  }
+
+  downloadReportJson(scanId: number): Observable<Blob> {
+    return this.http.get(`${this.base}/reports/${scanId}/json/download`, { responseType: 'blob' });
+  }
+
+  downloadReportMarkdown(scanId: number): Observable<Blob> {
+    return this.http.get(`${this.base}/reports/${scanId}/md`, { responseType: 'blob' });
   }
 
   getSettings(): Observable<Record<string, string>> {

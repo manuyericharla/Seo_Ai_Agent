@@ -59,6 +59,9 @@ async function shutdown(signal: string): Promise<void> {
 
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', { error: String(reason) });
+});
 
 httpServer = app.listen(config.port, () => {
   logger.info(`SEO Agent API listening on port ${config.port}`);

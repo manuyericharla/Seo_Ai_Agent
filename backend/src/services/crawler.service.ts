@@ -46,6 +46,41 @@ function canonicalPathUrl(baseOrigin: string, href: string): string {
   return u.origin + path;
 }
 
+function siteHostKey(origin: string): string {
+  return new URL(origin).hostname.replace(/^www\./i, '').toLowerCase();
+}
+
+function isSameSiteUrl(href: string, baseOrigin: string): boolean {
+  try {
+    return siteHostKey(new URL(href, baseOrigin).origin) === siteHostKey(baseOrigin);
+  } catch {
+    return false;
+  }
+}
+
+function alternateSiteOrigin(origin: string): string | null {
+  try {
+    const u = new URL(origin);
+    const host = u.hostname.toLowerCase();
+    if (host.startsWith('www.')) {
+      return `${u.protocol}//${host.slice(4)}`;
+    }
+    return `${u.protocol}//www.${host}`;
+  } catch {
+    return null;
+  }
+}
+
+async function discoverSitemapPageUrls(baseOrigin: string): Promise<string[]> {
+  let urls = await fetchSitemapUrls(baseOrigin);
+  if (urls.length > 0) return urls;
+  const alt = alternateSiteOrigin(baseOrigin);
+  if (!alt || alt === baseOrigin) return urls;
+  logger.info('Sitemap empty on primary origin; trying alternate host', { baseOrigin, alt });
+  urls = await fetchSitemapUrls(alt);
+  return urls;
+}
+
 function isLikelyHtmlPageUrl(url: string): boolean {
   try {
     const u = new URL(url);
@@ -282,11 +317,19 @@ function timeoutSignal(timeoutMs: number, parent?: AbortSignal): AbortSignal {
   return controller.signal;
 }
 
+/** `configured` <= 0: discover pages from the site (sitemap + internal links) until queue empty or ceiling. */
+function resolveCrawlPageLimit(configured: number): { limit: number; mode: 'auto' | 'fixed' } {
+  const ceiling = config.maxDiscoverablePages;
+  if (configured > 0) {
+    return { limit: configured, mode: 'fixed' };
+  }
+  return { limit: ceiling, mode: 'auto' };
+}
+
 export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal): Promise<CrawlPageResult[]> {
   const domain = normalizeDomain(domainInput);
   const baseOrigin = await resolveSiteOrigin(domain);
   const configured = config.maxPagesPerScan;
-  const pageLimit = configured <= 0 ? config.maxDiscoverablePages : configured;
   const workerCount = config.crawlWorkers;
   const maxDepth = config.crawlMaxDepth;
   const requestTimeoutMs = config.crawlTimeoutMs;
@@ -296,22 +339,47 @@ export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal
   const timeBudgetMs = config.scanTimeBudgetMs;
   const visited = new Set<string>();
   const queued = new Set<string>();
-  const queue: Array<{ url: string; depth: number }> = [{ url: baseOrigin + '/', depth: 0 }];
-  queued.add(baseOrigin + '/');
+  const queue: Array<{ url: string; depth: number }> = [];
+  const homeUrl = canonicalPathUrl(baseOrigin, '/');
+  const { limit: pageLimit, mode: pageLimitMode } = resolveCrawlPageLimit(configured);
+
+  const enqueue = (rawUrl: string, depth: number): void => {
+    if (!isSameSiteUrl(rawUrl, baseOrigin) || !isLikelyHtmlPageUrl(rawUrl)) return;
+    const url = canonicalPathUrl(baseOrigin, rawUrl);
+    if (queued.has(url) || visited.has(url) || queue.length >= pageLimit) return;
+    queued.add(url);
+    queue.push({ url, depth });
+  };
+
+  enqueue(homeUrl, 0);
 
   let sitemapUrls: string[] = [];
   try {
-    sitemapUrls = await fetchSitemapUrls(baseOrigin);
-    for (const u of sitemapUrls) {
-      if (!isLikelyHtmlPageUrl(u)) continue;
-      if (queued.has(u)) continue;
-      if (queue.length >= pageLimit) break;
-      queue.push({ url: u, depth: 1 });
-      queued.add(u);
-    }
+    sitemapUrls = await discoverSitemapPageUrls(baseOrigin);
   } catch (e) {
     logger.warn('sitemap bootstrap failed', { error: String(e) });
   }
+
+  const sitemapHtmlUrls = sitemapUrls.filter((u) => isLikelyHtmlPageUrl(u));
+  for (const u of sitemapHtmlUrls) {
+    enqueue(u, 1);
+  }
+
+  if (sitemapHtmlUrls.length === 0) {
+    logger.warn(
+      'No sitemap URLs found — SPAs with client-side routing may only crawl the homepage unless sitemap.xml is reachable',
+      { domain, baseOrigin }
+    );
+  }
+
+  logger.info('Crawl page limit resolved', {
+    domain,
+    mode: pageLimitMode,
+    pageLimit,
+    queueSize: queue.length,
+    sitemapUrls: sitemapHtmlUrls.length,
+    configuredMaxPagesPerScan: configured,
+  });
 
   const results: CrawlPageResult[] = [];
   const discoveredLinks = new Set<string>();
@@ -374,13 +442,7 @@ export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal
         .filter(Boolean)
         .slice(0, 15);
       const headings = [h1Text, ...subHeadings].filter(Boolean).slice(0, 16);
-      const links = extractLinks(html, baseOrigin).filter((href) => {
-        try {
-          return new URL(href).origin === baseOrigin;
-        } catch {
-          return false;
-        }
-      });
+      const links = extractLinks(html, baseOrigin).filter((href) => isSameSiteUrl(href, baseOrigin));
       const text = stripTags(html);
       const wordCount = text ? text.split(/\s+/).filter(Boolean).length : 0;
       const contentSnippet = text.slice(0, 750);
@@ -389,13 +451,9 @@ export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal
       const invalidNavLinks = extractInvalidNavLinks(html);
 
       for (const link of links) {
-        if (!isLikelyHtmlPageUrl(link)) continue;
-        discoveredLinks.add(link);
+        discoveredLinks.add(canonicalPathUrl(baseOrigin, link));
         if (depth >= maxDepth || results.length >= pageLimit) continue;
-        if (queue.length >= pageLimit) continue;
-        if (queued.has(link) || visited.has(link)) continue;
-        queued.add(link);
-        queue.push({ url: link, depth: depth + 1 });
+        enqueue(link, depth + 1);
       }
 
       results.push({
@@ -464,8 +522,10 @@ export async function crawlDomain(domainInput: string, abortSignal?: AbortSignal
   logger.info('Crawl finished', {
     domain,
     pages: results.length,
+    pageLimit,
+    pageLimitMode,
     workers: workerCount,
-    sitemapSeeded: sitemapUrls.length,
+    sitemapSeeded: sitemapHtmlUrls.length,
     maxDepth,
     linkChecks: Math.min(linkTargets.length, maxBrokenLinkChecks),
     timeBudgetMs,

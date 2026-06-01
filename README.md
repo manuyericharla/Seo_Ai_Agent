@@ -30,7 +30,7 @@ Copy `.env.example` to `.env` and set:
 | `EMAIL_FROM` | From header |
 | `REPORT_EMAIL_TO` | Optional default recipient for scheduled reports |
 | `CRON_SCHEDULE` | Cron expression (default `0 9 * * *`) |
-| `MAX_PAGES_PER_SCAN` | Cap pages per crawl (default `25`). Set **`0`** to crawl all discoverable same-origin pages. |
+| `MAX_PAGES_PER_SCAN` | Optional fixed cap per crawl. Default **`0`** = auto (all discoverable same-origin pages via sitemap + links, up to `MAX_DISCOVERABLE_PAGES`). |
 | `CRAWL_WORKERS` | Concurrent crawler workers (default `12`, min `10`, max `20`). |
 | `CRAWL_MAX_DEPTH` | Max internal-link depth from entry URLs (default `4`). |
 | `CRAWL_TIMEOUT_MS` | Per-request timeout in milliseconds (default `12000`). |

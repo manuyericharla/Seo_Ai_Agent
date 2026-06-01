@@ -18,6 +18,8 @@ import {
   postScanClaudePrEmail,
   getSeoTrend,
   getScanReportPdf,
+  getScanReportJsonDownload,
+  getScanReportMarkdown,
   getPageReportsJson,
   getKeywordOpportunities,
   getLatestKeywordOpportunities,
@@ -56,6 +58,12 @@ scanRouter.delete('/scans/:scanId', (req, res) => {
 });
 scanRouter.get('/reports/:scanId/pdf', (req, res) => {
   void getScanReportPdf(req, res);
+});
+scanRouter.get('/reports/:scanId/json/download', (req, res) => {
+  void getScanReportJsonDownload(req, res);
+});
+scanRouter.get('/reports/:scanId/md', (req, res) => {
+  void getScanReportMarkdown(req, res);
 });
 scanRouter.get('/reports/:scanId/json', (req, res) => {
   void getPageReportsJson(req, res);

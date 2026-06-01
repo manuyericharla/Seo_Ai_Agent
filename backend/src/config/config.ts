@@ -43,6 +43,7 @@ function parseDotNetPgConnectionString(raw: string): string {
 }
 
 function resolveDatabaseUrl(appSettings: ReturnType<typeof loadAppSettings>): string {
+  if (String(process.env.USE_SQLITE || '').toLowerCase() === 'true') return '';
   if (process.env.DATABASE_URL?.trim()) return process.env.DATABASE_URL.trim();
   const hiperbrains =
     process.env.HIPERBRAINS_DATABASE?.trim() ||
@@ -70,8 +71,8 @@ export const config = {
     from: process.env.EMAIL_FROM || '',
   },
   cronSchedule: process.env.CRON_SCHEDULE || '0 9 * * *',
-  /** Max pages per crawl; `0` = no limit (all discoverable same-origin URLs via links). */
-  maxPagesPerScan: num(process.env.MAX_PAGES_PER_SCAN, 25),
+  /** Max pages per crawl; `0` = auto (crawl all discoverable same-origin pages, up to maxDiscoverablePages). */
+  maxPagesPerScan: num(process.env.MAX_PAGES_PER_SCAN, 0),
   crawlWorkers: Math.max(10, Math.min(20, num(process.env.CRAWL_WORKERS, 12))),
   crawlMaxDepth: Math.max(1, num(process.env.CRAWL_MAX_DEPTH, 4)),
   crawlTimeoutMs: Math.max(3000, num(process.env.CRAWL_TIMEOUT_MS, 12000)),
