@@ -1,7 +1,7 @@
 <div class="page">
   <header class="page-toolbar">
     <div class="page-toolbar__titles">
-      <h1>Dashboard</h1>
+      <h1>SEO Dashboard</h1>
       <p class="muted">Overview of domains, scans, and automation status.</p>
     </div>
     <div class="date-chip-wrap" #rangePopoverRoot>
@@ -61,7 +61,7 @@
 
   @if (stats; as s) {
     <section class="cards" aria-label="Summary metrics">
-      <article class="card card-stat">
+      <article class="card card-stat card-stat--domains">
         <div class="card-stat__icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <circle cx="12" cy="12" r="9" />
@@ -78,7 +78,7 @@
           }
         </div>
       </article>
-      <article class="card card-stat">
+      <article class="card card-stat card-stat--pages">
         <div class="card-stat__icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <path d="M8 6h12M8 12h12M8 18h8" stroke-linecap="round" />
@@ -95,7 +95,7 @@
           }
         </div>
       </article>
-      <article class="card card-stat">
+      <article class="card card-stat card-stat--issues">
         <div class="card-stat__icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <path d="M12 9v4M12 17h.01" stroke-linecap="round" />
@@ -110,10 +110,9 @@
           } @else {
             <span class="trend trend--muted">— {{ trendCaptionForMetricRange() }}</span>
           }
-          <span class="trend-hint">GitHub issues from completed scans</span>
         </div>
       </article>
-      <article class="card card-stat card-stat--accent">
+      <article class="card card-stat card-stat--score">
         <div class="card-stat__icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
             <path d="M4 19V5M8 19V9M12 19v-6M16 19V7M20 19v-9" stroke-linecap="round" />

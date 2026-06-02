@@ -1,5 +1,5 @@
 .page {
-  max-width: 1100px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -9,11 +9,13 @@
   align-items: flex-start;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-bottom: 0.9rem;
+  margin-bottom: 1.15rem;
 }
 
 .page-head h1 {
   margin: 0 0 0.25rem;
+  font-size: 1.9rem;
+  line-height: 1.2;
 }
 
 .page-head p {
@@ -21,33 +23,34 @@
 }
 
 .summary-cards {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 0.7rem;
 }
 
 .summary-card {
-  min-width: 7rem;
+  min-width: 0;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
-  padding: 0.45rem 0.6rem;
+  border-radius: 12px;
+  box-shadow: none;
+  padding: 0.65rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.2rem;
 }
 
 .summary-card strong {
-  font-size: 1.05rem;
+  font-size: 1.45rem;
   line-height: 1.2;
+  color: #0f172a;
 }
 
 .summary-label {
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: #94a3b8;
+  font-size: 0.64rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.09em;
 }
 
 .summary-card.danger strong {
@@ -77,10 +80,10 @@
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-  margin-bottom: 1rem;
-  box-shadow: var(--shadow-card);
+  border-radius: 14px;
+  padding: 1rem 1rem;
+  margin-bottom: 1.05rem;
+  box-shadow: none;
 }
 
 .panel-title-row {
@@ -181,9 +184,13 @@ select {
 }
 
 .table th {
-  color: var(--muted);
+  color: #94a3b8;
+  font-size: 0.72rem;
   font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   white-space: nowrap;
+  background: #fbfcfd;
 }
 
 .pill {
@@ -290,6 +297,7 @@ select {
   color: var(--text);
   background: #fff;
   border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .report-dropdown {
@@ -399,7 +407,7 @@ button:disabled {
   width: 100%;
   margin-top: 0.85rem;
   padding-top: 0.65rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid #edf2f7;
 }
 
 .page-numbers {
@@ -427,4 +435,10 @@ button:disabled {
 
 .btn-danger:hover:not(:disabled) {
   background: #fef2f2;
+}
+
+@media (max-width: 1100px) {
+  .summary-cards {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
 }
