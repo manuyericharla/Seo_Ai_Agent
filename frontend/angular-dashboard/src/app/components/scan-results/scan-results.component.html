@@ -1,11 +1,27 @@
 <div class="page">
   <header class="page-head">
-    <h1>Scan history</h1>
-    <p class="muted">Recent scans with pages, SEO score, email, and GitHub automation status. Off-page reporting uses free crawl-based signals.</p>
-    <p class="muted">
-      <span class="live-rank-badge">Live Rank Enabled</span>
-      Audit reports (PDF, JSON, MD) include Google live rank positions (SerpAPI) for top keywords when enabled.
-    </p>
+    <div>
+      <h1>Scan history</h1>
+      <p class="muted">Track crawl quality, report delivery, and automation status from one place.</p>
+    </div>
+    <div class="summary-cards">
+      <div class="summary-card">
+        <span class="summary-label">Total scans</span>
+        <strong>{{ scans.length }}</strong>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Running</span>
+        <strong>{{ runningScanCount() }}</strong>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Completed</span>
+        <strong>{{ completedScanCount() }}</strong>
+      </div>
+      <div class="summary-card danger">
+        <span class="summary-label">Failed</span>
+        <strong>{{ failedScanCount() }}</strong>
+      </div>
+    </div>
   </header>
 
   @if (message) {
@@ -16,16 +32,28 @@
   }
 
   <section class="panel">
-    <label>Default email for “Send report”</label>
-    <input type="email" [(ngModel)]="emailTo" placeholder="reports@company.com" />
-    <label>Status filter</label>
-    <select [(ngModel)]="statusFilter" (ngModelChange)="onStatusFilterChange()">
-      <option value="all">All</option>
-      <option value="running">Running</option>
-      <option value="completed">Completed</option>
-      <option value="stopped">Stopped</option>
-      <option value="failed">Failed</option>
-    </select>
+    <div class="panel-title-row">
+      <h2>Filters & actions</h2>
+      <span class="hint">{{ filteredScans.length }} record(s)</span>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label>Default email for “Send report”</label>
+        <input type="email" [(ngModel)]="emailTo" placeholder="reports@company.com" />
+      </div>
+      <div class="field">
+        <label>Status filter</label>
+        <select [(ngModel)]="statusFilter" (ngModelChange)="onStatusFilterChange()">
+          <option value="all">All</option>
+          <option value="running">Running</option>
+          <option value="completed">Completed</option>
+          <option value="stopped">Stopped</option>
+          <option value="failed">Failed</option>
+        </select>
+      </div>
+    </div>
+
     <p class="hint">
       @if (runningScanCount() > 0) {
         {{ runningScanCount() }} scan(s) running — this page polls <code>/api/reports</code> every 5s until they
@@ -41,6 +69,9 @@
   </section>
 
   <div class="table-wrap panel">
+    <div class="panel-title-row">
+      <h2>Scan records</h2>
+    </div>
     <table class="table">
       <thead>
         <tr>
@@ -70,7 +101,7 @@
               </span>
             </td>
             <td>
-              <span class="pill">{{ s.status }}</span>
+              <span class="pill" [ngClass]="statusClass(s.status)">{{ s.status }}</span>
               @if ((s.status === 'failed' || s.status === 'stopped') && s.email_error) {
                 <div class="scan-detail err" [title]="s.email_error">{{ s.email_error }}</div>
               }
@@ -104,37 +135,28 @@
               }
             </td>
             <td>
-              <div class="report-downloads">
-                <button
-                  type="button"
-                  class="pdf-link"
-                  (click)="downloadReport(s, 'pdf')"
-                  [disabled]="isReportDownloading(s.id, 'pdf')"
-                >
-                  {{ isReportDownloading(s.id, 'pdf') ? 'PDF…' : 'PDF' }}
-                </button>
-                <button
-                  type="button"
-                  class="pdf-link"
-                  (click)="downloadReport(s, 'json')"
-                  [disabled]="isReportDownloading(s.id, 'json')"
-                >
-                  {{ isReportDownloading(s.id, 'json') ? 'JSON…' : 'JSON' }}
-                </button>
-                <button
-                  type="button"
-                  class="pdf-link"
-                  (click)="downloadReport(s, 'md')"
-                  [disabled]="isReportDownloading(s.id, 'md')"
-                >
-                  {{ isReportDownloading(s.id, 'md') ? 'MD…' : 'MD' }}
-                </button>
-              </div>
-              @if (s.status === 'completed') {
-                <div class="pdf-meta">
-                  <span class="live-rank-badge">Live Rank</span>
-                </div>
+              @if (reportDownloadingLabelForScan(s.id)) {
+                <div class="report-downloading">Downloading {{ reportDownloadingLabelForScan(s.id) }}…</div>
               }
+              <div class="report-menu">
+                <button
+                  type="button"
+                  class="report-trigger"
+                  [disabled]="reportDownloading != null"
+                  (click)="toggleReportMenu(s.id)"
+                  aria-label="Choose report format"
+                >
+                  Report <span aria-hidden="true">▾</span>
+                </button>
+
+                @if (reportMenuForScanId === s.id) {
+                  <div class="report-dropdown" role="menu" aria-label="Report formats">
+                    <button type="button" class="report-item" (click)="chooseReportFormat(s, 'pdf')">PDF</button>
+                    <button type="button" class="report-item" (click)="chooseReportFormat(s, 'json')">JSON</button>
+                    <button type="button" class="report-item" (click)="chooseReportFormat(s, 'md')">MD</button>
+                  </div>
+                }
+              </div>
             </td>
             <td class="actions-cell">
               <button type="button" (click)="sendReport(s)" [disabled]="busyId === s.id">

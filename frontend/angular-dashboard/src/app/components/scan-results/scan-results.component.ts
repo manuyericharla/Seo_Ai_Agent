@@ -1,4 +1,4 @@
-import { Component, inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -14,6 +14,7 @@ import { httpErrorMessage } from '../../utils/http-error';
 })
 export class ScanResultsComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
+  private readonly elementRef = inject(ElementRef<HTMLElement>);
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   scans: ScanRow[] = [];
@@ -26,6 +27,7 @@ export class ScanResultsComponent implements OnInit, OnDestroy {
   emailPrBusyId: number | null = null;
   deletingScanId: number | null = null;
   reportDownloading: { scanId: number; format: 'pdf' | 'json' | 'md' } | null = null;
+  reportMenuForScanId: number | null = null;
   showPrByScanId: Record<number, boolean> = {};
   message: string | null = null;
   error: string | null = null;
@@ -52,6 +54,14 @@ export class ScanResultsComponent implements OnInit, OnDestroy {
 
   runningScanCount(): number {
     return this.scans.filter((s) => s.status === 'running').length;
+  }
+
+  completedScanCount(): number {
+    return this.scans.filter((s) => s.status === 'completed').length;
+  }
+
+  failedScanCount(): number {
+    return this.scans.filter((s) => s.status === 'failed').length;
   }
 
   private stopRefreshTimer(): void {
@@ -113,8 +123,45 @@ export class ScanResultsComponent implements OnInit, OnDestroy {
     if (this.currentPage < 1) this.currentPage = 1;
   }
 
-  isReportDownloading(scanId: number, format: 'pdf' | 'json' | 'md'): boolean {
-    return this.reportDownloading?.scanId === scanId && this.reportDownloading.format === format;
+  reportDownloadingLabelForScan(scanId: number): 'PDF' | 'JSON' | 'MD' | null {
+    if (!this.reportDownloading || this.reportDownloading.scanId !== scanId) return null;
+    return this.reportDownloading.format === 'pdf'
+      ? 'PDF'
+      : this.reportDownloading.format === 'json'
+        ? 'JSON'
+        : 'MD';
+  }
+
+  toggleReportMenu(scanId: number): void {
+    this.reportMenuForScanId = this.reportMenuForScanId === scanId ? null : scanId;
+  }
+
+  chooseReportFormat(scan: ScanRow, format: 'pdf' | 'json' | 'md'): void {
+    this.reportMenuForScanId = null;
+    this.downloadReport(scan, format);
+  }
+
+  statusClass(status: ScanRow['status']): string {
+    if (status === 'completed') return 'status-completed';
+    if (status === 'running') return 'status-running';
+    if (status === 'failed') return 'status-failed';
+    if (status === 'stopped') return 'status-stopped';
+    return 'status-default';
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.reportMenuForScanId == null) return;
+    const targetNode = event.target as Node | null;
+    if (!targetNode) return;
+
+    const targetElement =
+      targetNode instanceof Element ? targetNode : (targetNode.parentElement ?? null);
+
+    // Close when click happens outside any report menu/trigger block.
+    if (!targetElement || !targetElement.closest('.report-menu')) {
+      this.reportMenuForScanId = null;
+    }
   }
 
   downloadReport(scan: ScanRow, format: 'pdf' | 'json' | 'md'): void {
